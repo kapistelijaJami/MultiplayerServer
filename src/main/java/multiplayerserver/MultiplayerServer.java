@@ -1,0 +1,119 @@
+package multiplayerserver;
+
+import java.net.InetAddress;
+import java.net.UnknownHostException;
+import java.util.Scanner;
+import multiplayerserver.packets.MovePacket;
+import multiplayerserver.packets.PacketRegistry;
+import multiplayerserver.packets.PingPacket;
+
+public class MultiplayerServer {
+
+    public static void main(String[] args) {
+		Scanner scan = new Scanner(System.in);
+		System.out.print("Server (Y/n): ");
+		String isServer = scan.nextLine();
+		
+		if (isServer.isBlank() || isServer.toLowerCase().equals("y")) {
+			PacketRegistry packetRegistryServer = new PacketRegistry();
+			Server server = new Server(Constants.SERVER_PORT, packetRegistryServer);
+			
+			packetRegistryServer.registerHandler(MovePacket.class, MultiplayerServer::handlePacket);
+			packetRegistryServer.registerHandler(PingPacket.class, (p) -> MultiplayerServer.handlePacket(p, server));
+			
+			server.start();
+			
+			try {
+				PacketRegistry packetRegistryClient = new PacketRegistry();
+				Client client = new Client(InetAddress.getByName("127.0.0.1"), Constants.SERVER_PORT, packetRegistryClient);
+				
+				packetRegistryClient.registerHandler(MovePacket.class, MultiplayerServer::handlePacket);
+				
+				client.connect();
+			} catch (UnknownHostException e) {
+				e.printStackTrace(System.err);
+			}
+		} else if (isServer.toLowerCase().equals("n")) {
+			try {
+				System.out.print("Server IP address: ");
+				String ipAddress = scan.nextLine();
+				
+				PacketRegistry packetRegistryClient = new PacketRegistry();
+				Client client = new Client(InetAddress.getByName(ipAddress), Constants.SERVER_PORT, packetRegistryClient);
+				
+				packetRegistryClient.registerHandler(MovePacket.class, MultiplayerServer::handlePacket);
+				packetRegistryClient.registerHandler(PingPacket.class, MultiplayerServer::handlePong);
+				
+				client.connect();
+				
+				client.sendPacket(new MovePacket(5, 10), Protocol.TCP);
+				
+				try {
+					Thread.sleep(1000);
+				} catch (InterruptedException e) {
+					
+				}
+				client.sendPacket(new PingPacket("ping"), Protocol.UDP);
+			} catch (UnknownHostException e) {
+				e.printStackTrace(System.err);
+			}
+		}
+		
+		
+		
+		
+		
+		
+		/* OLD CODE:
+		ServerPacketHandler serverPacketHandler = new ServerPacketHandler();
+		ClientPacketHandler clientPacketHandler = new ClientPacketHandler();
+		
+		//UDP
+		if (isServer.isBlank() || isServer.toLowerCase().equals("y")) {
+			UDPServer server = new UDPServer(serverPacketHandler);
+			serverPacketHandler.setUDPServer(server);
+			new Thread(server).start();
+			System.out.println("Started server!");
+		} else if (isServer.toLowerCase().equals("n")) {
+			try {
+				UDPClient client = new UDPClient(InetAddress.getByName("localhost"), 22223, clientPacketHandler);
+				new Thread(client).start();
+				System.out.println("Sending packet!");
+				client.sendData("Hello");
+			} catch (UnknownHostException e) {
+				e.printStackTrace(System.err);
+			}
+		}
+		
+		
+		//TCP
+		if (isServer.isBlank() || isServer.toLowerCase().equals("y")) {
+			TCPServer server = new TCPServer(serverPacketHandler);
+			new Thread(server).start();
+			System.out.println("Started server!");
+		} else if (isServer.toLowerCase().equals("n")) {
+			try {
+				TCPClient client = new TCPClient(InetAddress.getByName("localhost"), 22223, clientPacketHandler);
+				client.start();
+				System.out.println("Sending packet!");
+				client.sendData("Hello");
+			} catch (UnknownHostException e) {
+				e.printStackTrace(System.err);
+			}
+		}*/
+    }
+	
+	public static void handlePacket(MovePacket packet) {
+		System.out.println("Packet received! " + packet.x + ", " + packet.y);
+		
+	}
+	
+	public static void handlePacket(PingPacket packet, Server server) {
+		System.out.println("Packet received! " + packet.text + ", " + packet.startTime);
+		server.sendPacket(packet.senderUuid, new PingPacket("pong", packet.startTime), Protocol.TCP);
+	}
+	
+	public static void handlePong(PingPacket packet) {
+		System.out.println("Packet received! " + packet.text + ", " + packet.startTime + ". Round trip time: " + (System.currentTimeMillis() - packet.startTime) + " ms");
+	}
+}

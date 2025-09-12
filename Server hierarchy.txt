@@ -1,0 +1,73 @@
+MultiplayerServer
+│
+├─ Packet.java
+│   ├─ Fields:
+│   │   └─ UUID senderUuid
+│   ├─ Constructors:
+│   │   └─ Packet()
+│   │   └─ Packet(UUID senderUuid)
+│   └─ (No methods; Gson handles serialization)
+│
+├─ PacketRegistry.java
+│   ├─ Fields:
+│   │   ├─ Map<Integer, Class<? extends Packet>> idToClass
+│   │   ├─ Map<Class<? extends Packet>, Integer> classToId
+│   │   ├─ Map<Class<? extends Packet>, Consumer<? extends Packet>> handlers
+│   │   ├─ Consumer<Packet> defaultHandler
+│   │   ├─ Consumer<Packet> globalHandler
+│   │   └─ Gson gson
+│   ├─ Methods:
+│   │   ├─ <T extends Packet> void register(Class<T> clazz, Consumer<T> handler)
+│   │   ├─ void setDefaultHandler(Consumer<Packet> handler)
+│   │   ├─ void setGlobalHandler(Consumer<Packet> handler)
+│   │   ├─ String serialize(Packet packet)
+│   │   ├─ Packet parsePacket(String payload)
+│   │   ├─ void callHandler(Packet packet)
+│   │   └─ int getId(Class<? extends Packet> clazz)
+│
+├─ Server.java
+│   ├─ Fields:
+│   │   ├─ int serverPort
+│   │   ├─ ServerSocket tcpSocket
+│   │   ├─ DatagramSocket udpSocket
+│   │   ├─ Map<ClientInformation> clients
+│   │   ├─ PacketRegistry packetRegistry
+│   │   └─ boolean running
+│   ├─ Methods:
+│   │   ├─ Server(int serverPort, PacketRegistry registry)
+│   │   ├─ void start()                  // start TCP/UDP listening threads
+│   │   ├─ void sendTCP(ClientInformation client, Packet packet)
+│   │   ├─ void sendUDP(ClientInformation client, Packet packet)
+│   │   ├─ void broadcastTCP(Packet packet)
+│   │   └─ void broadcastUDP(Packet packet)
+│
+├─ ClientInformation.java
+│   ├─ Fields:
+│   │   ├─ Socket tcpSocket
+│   │   ├─ InetAddress address
+│   │   ├─ int udpPort
+│   │   └─ UUID uuid
+│   ├─ Methods:
+│   │   ├─ ClientInformation(Socket tcpSocket, UUID uuid)
+│   │   └─ void sendTCP(Packet packet)
+│
+├─ Client.java
+│   ├─ Fields:
+│   │   ├─ InetAddress serverIP
+│   │   ├─ int serverPort
+│   │   ├─ Socket tcpSocket
+│   │   ├─ DatagramSocket udpSocket
+│   │   ├─ PacketRegistry packetRegistry
+│   │   └─ boolean running
+│   ├─ Methods:
+│   │   ├─ Client(InetAddress serverIP, int serverPort, PacketRegistry registry)
+│   │   ├─ void connect()                // establish TCP connection and UDP bind
+│   │   ├─ void listenTCP()              // runs in a thread, reads packets and calls registry.handle()
+│   │   ├─ void listenUDP()              // runs in a thread, reads packets and calls registry.handle()
+│   │   └─ void sendPacket(Packet packet, Protocol protocol)
+│
+├─ ExamplePacket.java (optional base for testing)
+│   ├─ Fields:
+│   │   └─ int x, y
+│   └─ Constructors:
+│       └─ ExamplePacket() / ExamplePacket(UUID sender, int x, int y)
