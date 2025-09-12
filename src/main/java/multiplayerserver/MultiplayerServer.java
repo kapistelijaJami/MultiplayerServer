@@ -58,49 +58,6 @@ public class MultiplayerServer {
 				e.printStackTrace(System.err);
 			}
 		}
-		
-		
-		
-		
-		
-		
-		/* OLD CODE:
-		ServerPacketHandler serverPacketHandler = new ServerPacketHandler();
-		ClientPacketHandler clientPacketHandler = new ClientPacketHandler();
-		
-		//UDP
-		if (isServer.isBlank() || isServer.toLowerCase().equals("y")) {
-			UDPServer server = new UDPServer(serverPacketHandler);
-			serverPacketHandler.setUDPServer(server);
-			new Thread(server).start();
-			System.out.println("Started server!");
-		} else if (isServer.toLowerCase().equals("n")) {
-			try {
-				UDPClient client = new UDPClient(InetAddress.getByName("localhost"), 22223, clientPacketHandler);
-				new Thread(client).start();
-				System.out.println("Sending packet!");
-				client.sendData("Hello");
-			} catch (UnknownHostException e) {
-				e.printStackTrace(System.err);
-			}
-		}
-		
-		
-		//TCP
-		if (isServer.isBlank() || isServer.toLowerCase().equals("y")) {
-			TCPServer server = new TCPServer(serverPacketHandler);
-			new Thread(server).start();
-			System.out.println("Started server!");
-		} else if (isServer.toLowerCase().equals("n")) {
-			try {
-				TCPClient client = new TCPClient(InetAddress.getByName("localhost"), 22223, clientPacketHandler);
-				client.start();
-				System.out.println("Sending packet!");
-				client.sendData("Hello");
-			} catch (UnknownHostException e) {
-				e.printStackTrace(System.err);
-			}
-		}*/
     }
 	
 	public static void handlePacket(MovePacket packet) {
