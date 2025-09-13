@@ -29,7 +29,7 @@ import multiplayerserver.packets.Packet;
  * lambda function and return a list of your own objects, as long as they implement HasUUID interface.
  */
 public class TargetRegistry {
-	private final Map<String, BiFunction<Server, Target, List<HasUUID>>> resolvers = new HashMap<>();
+	private final Map<String, BiFunction<Server, Target, List<? extends HasUUID>>> resolvers = new HashMap<>();
     private final Server server;
 	
 	public TargetRegistry(Server server) {
@@ -49,9 +49,7 @@ public class TargetRegistry {
 			return host != null ? List.of(host) : Collections.emptyList();
 		});
 		
-		register(Target.ALL_BUT_HOST_CLIENT, (s, t) -> s.getClients().stream()
-			.filter(c -> !c.equals(s.getHostClient()))
-			.collect(Collectors.toList()));
+		register(Target.ALL_BUT_HOST_CLIENT, (s, t) -> s.getAllClientsExcept(s.getHostClient().getUuid()));
 		
 		register(Target.UUID, (s, t) -> {
 			ClientInformation client = s.getClient(t.getUuid());
@@ -59,22 +57,22 @@ public class TargetRegistry {
 		});
 	}
 	
-	public void register(Target target, BiFunction<Server, Target, List<HasUUID>> resolver) {
+	public void register(Target target, BiFunction<Server, Target, List<? extends HasUUID>> resolver) {
         resolvers.put(target.getGroupName(), resolver);
     }
 	
-	public List<HasUUID> resolveTargets(Target target) {
+	public <T extends HasUUID> List<T> resolveTargets(Target target) {
 		if (target == null) { //TODO: See if we want to do null checking, or if we want to do something else when target is null, probably messages meant for server will be null.
 			return Collections.emptyList();
 		}
 		
-        BiFunction<Server, Target, List<HasUUID>> resolver = resolvers.get(target.getGroupName());
+        BiFunction<Server, Target, List<? extends HasUUID>> resolver = resolvers.get(target.getGroupName());
 		
         if (resolver == null) {
             throw new IllegalArgumentException("Unknown target: " + target.getGroupName());
         }
 		
-        return resolver.apply(server, target);
+        return (List<T>) resolver.apply(server, target);
     }
 	
 	public void sendToTargets(List<? extends HasUUID> targets, Packet packet, Protocol protocol) {

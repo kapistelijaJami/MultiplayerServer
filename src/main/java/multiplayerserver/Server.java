@@ -12,8 +12,10 @@ import java.net.SocketException;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
+import java.util.ArrayList;
 import java.util.Map;
 import java.util.UUID;
+import java.util.stream.Collectors;
 import multiplayerserver.packets.Packet;
 import multiplayerserver.packets.PacketRegistry;
 import multiplayerserver.packets.SendUuid;
@@ -178,8 +180,15 @@ public class Server {
 		return clients.get(uuid);
 	}
 	
-	public Collection<ClientInformation> getClients() {
-		return clients.values();
+	public List<ClientInformation> getClients() {
+		return new ArrayList<>(clients.values());
+	}
+	
+	public List<ClientInformation> getAllClientsExcept(UUID uuid) {
+		ClientInformation excluded = clients.get(uuid);
+		return clients.values().stream()
+				.filter(c -> c != excluded)
+				.collect(Collectors.toList());
 	}
 	
 	public ClientInformation getHostClient() {
