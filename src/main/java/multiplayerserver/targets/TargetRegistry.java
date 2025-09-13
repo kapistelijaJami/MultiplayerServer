@@ -24,9 +24,10 @@ public class TargetRegistry {
 	}
 	
 	private void registerBuiltInTargets() {
-		register(Target.ALL, s -> new ArrayList<>(s.getClients())); //All clients //TODO: make sure this doesn't send back to original client
+		register(Target.ALL, s -> new ArrayList<>(s.getClients()));
 		
-		register(Target.SERVER, s -> Collections.emptyList());
+		register(Target.SERVER, s -> Collections.emptyList()); //TODO: See what to do with server, since it's not a client, and this returns a list of clients.
+															   //Could either remove the server target, or have it not do anything, like it is now.
 		
 		register(Target.HOST_CLIENT, s -> {
 			ClientInformation host = s.getHostClient();
@@ -42,8 +43,8 @@ public class TargetRegistry {
         resolvers.put(target.getName(), resolver);
     }
 	
-	public List<ClientInformation> resolve(Target target) {
-		if (target == null) { //TODO: See if this is correct for null checking, or if we want to do something else when target is null.
+	public List<ClientInformation> resolveTargets(Target target) {
+		if (target == null) { //TODO: See if we want to do null checking, or if we want to do something else when target is null, probably messages meant for server will be null.
 			return Collections.emptyList();
 		}
         Function<Server, List<ClientInformation>> resolver = resolvers.get(target.getName());

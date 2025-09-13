@@ -14,6 +14,7 @@ import java.nio.ByteBuffer;
 import java.util.UUID;
 import multiplayerserver.packets.Packet;
 import multiplayerserver.packets.PacketRegistry;
+import multiplayerserver.packets.SendUuid;
 
 public class Client implements HasUUID {
 	private final InetAddress serverIP;
@@ -43,54 +44,55 @@ public class Client implements HasUUID {
 			
 			udpSocket = new DatagramSocket();
 			udpSocket.connect(serverIP, serverPort);
-			
-			System.out.println("Client connected!");
+			System.out.println("[Client] Client connected!");
 			
 			new Thread(this::listenTCP).start();
 			new Thread(this::listenUDP).start();
+			
+			sendPacket(new SendUuid(uuid), Protocol.TCP);
 		} catch (IOException e) {
 			e.printStackTrace(System.err);
 		}
 	}
 	
 	private void listenTCP() {
-		System.out.println("Client listening TCP!");
+		System.out.println("[Client] Listening TCP!");
 		
 		try (InputStream in = tcpSocket.getInputStream();
-             DataInputStream dataInput = new DataInputStream(in)) {
+				DataInputStream dataInput = new DataInputStream(in)) {
 			
 			while (running) {
 				int packetLength = dataInput.readInt();
-				System.out.println("Read packet length: " + packetLength);
+				System.out.println("[Client] Received packet length TCP: " + packetLength);
 				byte[] packetData = new byte[packetLength];
 				dataInput.readFully(packetData);
-				System.out.println("Read fully!");
+				System.out.println("[Client] Received packet TCP");
 				
 				String payload = new String(packetData);
+				System.out.println("[Client] Payload: " + payload);
 				
 				Packet packet = packetRegistry.parsePacket(payload);
+				System.out.println("[Client] Packet parsed!");
 				
 				packetRegistry.callHandler(packet);
 			}
 		} catch (EOFException e) {
-			System.out.println("Client disconnected!");
+			System.out.println("[Client] Server closed connection TCP. Stopping listener."); //TODO: Could stop the whole client as well?
         } catch (SocketException e) {
-			System.out.println("Connection closed.");
+			System.out.println("[Client] Connection closed TCP. Stopping listener.");
 		} catch (IOException e) {
 			e.printStackTrace(System.err);
-		} finally {
-            System.out.println("Client disconnected!");
-        }
+		}
 	}
 	
 	private void listenUDP() {
 		byte[] data = new byte[1024];
 		DatagramPacket udpPacket = new DatagramPacket(data, data.length);
 		
-		System.out.println("Client listening UDP!");
+		System.out.println("[Client] Listening UDP!");
 		
-		while (running) {
-			try {
+		try {
+			while (running) {
 				udpSocket.receive(udpPacket);
 				
 				String payload = new String(udpPacket.getData(), 0, udpPacket.getLength());
@@ -98,14 +100,16 @@ public class Client implements HasUUID {
 				Packet packet = packetRegistry.parsePacket(payload);
 				
 				packetRegistry.callHandler(packet);
-			} catch (IOException e) {
-				e.printStackTrace(System.err);
 			}
+		} catch (SocketException e) {
+			System.out.println("[Client] Connection closed UDP. Stopping listener.");
+		} catch (IOException e) {
+			e.printStackTrace(System.err);
 		}
 	}
 	
 	public void sendPacket(Packet packet, Protocol protocol) {
-		System.out.println("Sending packet! Protocol: " + protocol);
+		System.out.println("[Client] Sending packet! Protocol: " + protocol);
 		if (protocol == Protocol.TCP) {
 			sendTCP(packet);
 		} else if (protocol == Protocol.UDP) {
@@ -152,5 +156,15 @@ public class Client implements HasUUID {
 		return uuid;
 	}
 	
-	//TODO: Create stop() method.
+	public void stop() {
+		running = false;
+		try {
+			tcpSocket.close();
+			udpSocket.close();
+		} catch (IOException e) {
+			e.printStackTrace(System.err);
+		}
+		
+		System.out.println("Client stopped.");
+	}
 }

@@ -16,7 +16,7 @@ import multiplayerserver.packets.PacketRegistry;
  */
 public class ClientInformation implements HasUUID {
 	private final InetAddress ipAddress;
-	private final Socket tcpSocket;
+	private Socket tcpSocket;
 	private int udpPort = -1;
 	private UUID uuid = null;
 	
@@ -26,6 +26,17 @@ public class ClientInformation implements HasUUID {
 		this.ipAddress = tcpSocket.getInetAddress();
 		this.tcpSocket = tcpSocket;
 		this.registry = registry;
+	}
+	
+	public ClientInformation(InetAddress ipAddress, int udpPort, UUID uuid, PacketRegistry registry) {
+		this.ipAddress = ipAddress;
+		this.udpPort = udpPort;
+		this.uuid = uuid;
+		this.registry = registry;
+	}
+	
+	public void setTcpSocket(Socket tcpSocket) {
+		this.tcpSocket = tcpSocket;
 	}
 	
 	public void setUdpPort(int clientUdpPort) {

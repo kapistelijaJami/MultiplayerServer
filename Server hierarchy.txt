@@ -2,53 +2,81 @@ MultiplayerServer
 │
 ├─ Packet.java
 │   ├─ Fields:
-│   │   └─ UUID senderUuid
+│   │   ├─ UUID senderUuid
+│   │   └─ Target target
 │   ├─ Constructors:
-│   │   └─ Packet()
-│   │   └─ Packet(UUID senderUuid)
-│   └─ (No methods; Gson handles serialization)
+│   │   ├─ Packet()
+│   │   ├─ Packet(UUID senderUuid)
+│   │   ├─ Packet(Target target)
+│   │   └─ Packet(UUID senderUuid, Target target)
 │
 ├─ PacketRegistry.java
 │   ├─ Fields:
-│   │   ├─ Map<Integer, Class<? extends Packet>> idToClass
-│   │   ├─ Map<Class<? extends Packet>, Integer> classToId
+│   │   ├─ Map<String, Class<? extends Packet>> classNameToClass
+│   │   ├─ Map<Class<? extends Packet>, String> classToClassName
 │   │   ├─ Map<Class<? extends Packet>, Consumer<? extends Packet>> handlers
 │   │   ├─ Consumer<Packet> defaultHandler
 │   │   ├─ Consumer<Packet> globalHandler
 │   │   └─ Gson gson
 │   ├─ Methods:
-│   │   ├─ <T extends Packet> void register(Class<T> clazz, Consumer<T> handler)
+│   │   ├─ PacketRegistry()
+│   │   ├─ void registerBuiltInPackets()
+│   │   ├─ <T extends Packet> void registerPacket(Class<T> clazz)
+│   │   ├─ <T extends Packet> void registerHandler(Class<T> clazz, Consumer<T> handler)
 │   │   ├─ void setDefaultHandler(Consumer<Packet> handler)
 │   │   ├─ void setGlobalHandler(Consumer<Packet> handler)
 │   │   ├─ String serialize(Packet packet)
 │   │   ├─ Packet parsePacket(String payload)
-│   │   ├─ void callHandler(Packet packet)
-│   │   └─ int getId(Class<? extends Packet> clazz)
+│   │   └─ void callHandler(Packet packet)
 │
 ├─ Server.java
 │   ├─ Fields:
 │   │   ├─ int serverPort
 │   │   ├─ ServerSocket tcpSocket
 │   │   ├─ DatagramSocket udpSocket
-│   │   ├─ Map<ClientInformation> clients
+│   │   ├─ Map<UUID, ClientInformation> clients
 │   │   ├─ PacketRegistry packetRegistry
+│   │   ├─ TargetRegistry targetRegistry
+│   │   ├─ ClientInformation hostClient
 │   │   └─ boolean running
 │   ├─ Methods:
 │   │   ├─ Server(int serverPort, PacketRegistry registry)
-│   │   ├─ void start()                  // start TCP/UDP listening threads
+│   │   ├─ void start()
+│   │   ├─ void tcpAcceptLoop()
+│   │   ├─ void tcpClientLoop(ClientInformation client)
+│   │   ├─ void udpReceiveLoop()
+│   │   ├─ void handlePacket(Packet packet, Protocol protocol)
+│   │   ├─ Collection<ClientInformation> getClients()
+│   │   ├─ ClientInformation getHostClient()
+│   │   ├─ PacketRegistry getPacketRegistry()
+│   │   ├─ TargetRegistry getTargetRegistry()
+│   │   ├─ void sendToTargets(List<? extends HasUUID> targets, Packet packet, Protocol protocol)
+│   │   ├─ void sendPacket(UUID uuid, Packet packet, Protocol protocol)
+│   │   ├─ void sendPacket(ClientInformation client, Packet packet, Protocol protocol)
+│   │   ├─ void sendTCP(UUID uuid, Packet packet)
 │   │   ├─ void sendTCP(ClientInformation client, Packet packet)
+│   │   ├─ void sendUDP(UUID uuid, Packet packet)
 │   │   ├─ void sendUDP(ClientInformation client, Packet packet)
-│   │   ├─ void broadcastTCP(Packet packet)
-│   │   └─ void broadcastUDP(Packet packet)
+│   │   ├─ void addClient(ClientInformation client)
+│   │   └─ void stop()
 │
 ├─ ClientInformation.java
 │   ├─ Fields:
+│   │   ├─ InetAddress ipAddress
 │   │   ├─ Socket tcpSocket
-│   │   ├─ InetAddress address
 │   │   ├─ int udpPort
-│   │   └─ UUID uuid
+│   │   ├─ UUID uuid
+│   │   └─ PacketRegistry registry
 │   ├─ Methods:
-│   │   ├─ ClientInformation(Socket tcpSocket, UUID uuid)
+│   │   ├─ ClientInformation(Socket tcpSocket, PacketRegistry registry)
+│   │   ├─ ClientInformation(InetAddress ipAddress, int udpPort, UUID uuid, PacketRegistry registry)
+│   │   ├─ void setTcpSocket(Socket tcpSocket)
+│   │   ├─ void setUdpPort(int clientUdpPort)
+│   │   ├─ void setUuid(UUID uuid)
+│   │   ├─ InetAddress getIpAddress()
+│   │   ├─ Socket getTcpSocket()
+│   │   ├─ int getUdpPort()
+│   │   ├─ UUID getUuid()
 │   │   └─ void sendTCP(Packet packet)
 │
 ├─ Client.java
@@ -57,17 +85,40 @@ MultiplayerServer
 │   │   ├─ int serverPort
 │   │   ├─ Socket tcpSocket
 │   │   ├─ DatagramSocket udpSocket
+│   │   ├─ UUID uuid
 │   │   ├─ PacketRegistry packetRegistry
 │   │   └─ boolean running
 │   ├─ Methods:
 │   │   ├─ Client(InetAddress serverIP, int serverPort, PacketRegistry registry)
-│   │   ├─ void connect()                // establish TCP connection and UDP bind
-│   │   ├─ void listenTCP()              // runs in a thread, reads packets and calls registry.handle()
-│   │   ├─ void listenUDP()              // runs in a thread, reads packets and calls registry.handle()
-│   │   └─ void sendPacket(Packet packet, Protocol protocol)
+│   │   ├─ void connect()
+│   │   ├─ void listenTCP()
+│   │   ├─ void listenUDP()
+│   │   ├─ void sendPacket(Packet packet, Protocol protocol)
+│   │   ├─ void sendTCP(Packet packet)
+│   │   ├─ void sendUDP(Packet packet)
+│   │   ├─ UUID getUuid()
+│   │   └─ void stop()
 │
-├─ ExamplePacket.java (optional base for testing)
+├─ Target.java
 │   ├─ Fields:
-│   │   └─ int x, y
-│   └─ Constructors:
-│       └─ ExamplePacket() / ExamplePacket(UUID sender, int x, int y)
+│   │   ├─ String name
+│   ├─ Constructors:
+│   │   ├─ Packet()
+│   │   ├─ Packet(UUID senderUuid)
+│   │   ├─ Packet(Target target)
+│   │   └─ Packet(UUID senderUuid, Target target)
+│   ├─ Static Fields:
+│   │   ├─ Target ALL
+│   │   ├─ Target SERVER
+│   │   ├─ Target HOST_CLIENT
+│   │   └─ Target ALL_BUT_HOST_CLIENT
+│
+├─ TargetRegistry.java
+│   ├─ Fields:
+│   │   └─ Map<String, Function<Server, List<ClientInformation>>> resolvers
+│   ├─ Methods:
+│   │   ├─ TargetRegistry(Server server)
+│   │   ├─ void registerBuiltInTargets()
+│   │   ├─ void register(Target target, Function<Server, List<ClientInformation>> resolver)
+│   │   ├─ List<ClientInformation> resolveTargets(Target target)
+│   │   └─ void sendToTargets(List<? extends HasUUID> targets, Packet packet, Protocol protocol)

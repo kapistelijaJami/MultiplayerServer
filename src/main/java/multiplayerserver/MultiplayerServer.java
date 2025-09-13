@@ -18,8 +18,8 @@ public class MultiplayerServer {
 			PacketRegistry packetRegistryServer = new PacketRegistry();
 			Server server = new Server(Constants.SERVER_PORT, packetRegistryServer);
 			
-			packetRegistryServer.registerHandler(MovePacket.class, MultiplayerServer::handlePacket);
-			packetRegistryServer.registerHandler(PingPacket.class, (p) -> MultiplayerServer.handlePacket(p, server));
+			packetRegistryServer.registerPacket(MovePacket.class);
+			packetRegistryServer.registerHandler(PingPacket.class, p -> MultiplayerServer.handlePacket(p, server));
 			
 			server.start();
 			
@@ -27,16 +27,24 @@ public class MultiplayerServer {
 				PacketRegistry packetRegistryClient = new PacketRegistry();
 				Client client = new Client(InetAddress.getByName("127.0.0.1"), Constants.SERVER_PORT, packetRegistryClient);
 				
-				packetRegistryClient.registerHandler(MovePacket.class, MultiplayerServer::handlePacket);
-				
 				client.connect();
 			} catch (UnknownHostException e) {
 				e.printStackTrace(System.err);
 			}
+			
+			/*try {
+				Thread.sleep(15000);
+				server.stop();
+			} catch (InterruptedException e) {
+				e.printStackTrace(System.err);
+			}*/
 		} else if (isServer.toLowerCase().equals("n")) {
 			try {
 				System.out.print("Server IP address: ");
 				String ipAddress = scan.nextLine();
+				if (ipAddress.isBlank()) {
+					ipAddress = "localhost";
+				}
 				
 				PacketRegistry packetRegistryClient = new PacketRegistry();
 				Client client = new Client(InetAddress.getByName(ipAddress), Constants.SERVER_PORT, packetRegistryClient);
@@ -48,13 +56,17 @@ public class MultiplayerServer {
 				
 				client.sendPacket(new MovePacket(5, 10), Protocol.TCP);
 				
-				try {
-					Thread.sleep(1000);
-				} catch (InterruptedException e) {
-					
-				}
+				Thread.sleep(1000);
+				
 				client.sendPacket(new PingPacket("ping"), Protocol.UDP);
-			} catch (UnknownHostException e) {
+				
+				try {
+					Thread.sleep(3000);
+					client.stop();
+				} catch (InterruptedException e) {
+					e.printStackTrace(System.err);
+				}
+			} catch (UnknownHostException | InterruptedException e) {
 				e.printStackTrace(System.err);
 			}
 		}

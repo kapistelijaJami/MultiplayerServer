@@ -9,7 +9,6 @@ import java.net.DatagramSocket;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.net.SocketException;
-import java.nio.ByteBuffer;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
@@ -28,7 +27,7 @@ public class Server {
 	private final PacketRegistry packetRegistry;
 	private TargetRegistry targetRegistry;
 	
-	private ClientInformation hostClient; //TODO: Set host client
+	private ClientInformation hostClient;
 	
 	private boolean running = false;
 	
@@ -46,27 +45,30 @@ public class Server {
 			tcpSocket = new ServerSocket(serverPort);
 			udpSocket = new DatagramSocket(serverPort);
 			
-			System.out.println("Server started!");
+			System.out.println("[Server] Server started!");
 			
 			new Thread(this::tcpAcceptLoop).start();
 			new Thread(this::udpReceiveLoop).start();
-		} catch (IOException e) { //TODO: Might need to just throw exception to allow the developer to catch and log themselves.
+		} catch (IOException e) {
 			e.printStackTrace(System.err);
 		}
 	}
 	
 	private void tcpAcceptLoop() {
-		System.out.println("Server listening TCP!");
+		System.out.println("[Server] Listening TCP!");
 		
 		while (running) {
 			try {
 				Socket clientSocket = tcpSocket.accept();
 				clientSocket.setKeepAlive(true);
-				System.out.println("New client connected: " + clientSocket.getRemoteSocketAddress());
+				System.out.println("[Server] New client connected: " + clientSocket.getRemoteSocketAddress());
 				
 				ClientInformation client = new ClientInformation(clientSocket, packetRegistry);
                 
 				new Thread(() -> tcpClientLoop(client)).start();
+			} catch (SocketException e) {
+				System.out.println("[Server] ServerSocket closed! Stopping listener.");
+				break;
 			} catch (IOException e) {
 				e.printStackTrace(System.err);
 			}
@@ -74,96 +76,95 @@ public class Server {
 	}
 	
 	private void tcpClientLoop(ClientInformation client) {
-		System.out.println("Started listening inputStream!");
+		System.out.println("[Server] Listening inputStream!");
 		
-		try (InputStream in = client.getTcpSocket().getInputStream();
-             DataInputStream dataInput = new DataInputStream(in)) {
+		try (Socket socket = client.getTcpSocket();
+				InputStream in = socket.getInputStream();
+				DataInputStream dataInput = new DataInputStream(in)) {
 			
 			while (running) {
 				int packetLength = dataInput.readInt();
-				System.out.println("Received packet length TCP: " + packetLength);
 				byte[] packetData = new byte[packetLength];
 				dataInput.readFully(packetData);
-				System.out.println("Received packet TCP");
-				
-				/*int length = ByteBuffer.wrap(in.readNBytes(Constants.PACKET_LENGTH_PREFIX_BYTES)).getInt();
-				byte[] data = in.readNBytes(length);*/
+				System.out.println("[Server] Received packet TCP");
 				
 				String payload = new String(packetData);
-				
-				System.out.println("Payload: " + payload);
 				Packet packet = packetRegistry.parsePacket(payload);
-				System.out.println("Packet parsed!");
-				if (client.getUuid() == null) {
+				System.out.println("[Server] Packet parsed!");
+				
+				if (client.getUuid() == null) { //First time receiving a packet, set uuid and add to clients list.
 					client.setUuid(packet.senderUuid);
-
-					synchronized (clients) {
-						clients.put(client.getUuid(), client);
-					}
+					addClient(client);
+				} else if (clients.containsKey(client.getUuid()) && !(clients.get(client.getUuid()).equals(client))) {
+					//If client was created with UDP, then use the already added client, and add tcpSocket to it.
+					ClientInformation temp = client;
+					client = clients.get(client.getUuid());
+					client.setTcpSocket(temp.getTcpSocket());
+					System.out.println("[Server] TCP socket set!");
 				}
 				
-				System.out.println("Sender UUID: " + client.getUuid());
+				System.out.println("[Server] Client: " + client.getIpAddress() + ", uuid: " + client.getUuid());
 				
-				//TODO: Should this be before or after callHandler()?
-				//TODO: Should the callHandler be called if server is not in the targets?
-				List<ClientInformation> recipients = targetRegistry.resolve(packet.target);
-				sendToTargets(recipients, packet, Protocol.TCP);
-
-				packetRegistry.callHandler(packet);
+				handlePacket(packet, Protocol.TCP);
 			}
 		} catch (EOFException e) {
-			System.out.println("Client disconnected!");
+			System.out.println("[Server] Client disconnected normally TCP: " + client.getUuid());
         } catch (SocketException e) {
-			System.out.println("Connection closed.");
+			System.out.println("[Server] Socket closed TCP!");
 		} catch (IOException e) {
 			e.printStackTrace(System.err);
-		} finally {
-            System.out.println("Client disconnected: " + client.getUuid());
-            synchronized (clients) {
-				clients.remove(client.getUuid());
-			}
-        }
+		}
+		
+		synchronized (clients) {
+			clients.remove(client.getUuid());
+		}
 	}
 	
 	private void udpReceiveLoop() {
 		byte[] data = new byte[1024];
 		DatagramPacket udpPacket = new DatagramPacket(data, data.length);
 		
-		System.out.println("Server listening UDP!");
+		System.out.println("[Server] Listening UDP!");
 		
-		while (running) {
-			try {
+		try {
+			while (running) {
 				udpSocket.receive(udpPacket);
-				System.out.println("Received packet UDP");
+				System.out.println("[Server] Received packet UDP");
 				
 				String payload = new String(udpPacket.getData(), 0, udpPacket.getLength());
-				
 				Packet packet = packetRegistry.parsePacket(payload);
-				System.out.println("Packet parsed UDP");
+				System.out.println("[Server] Packet parsed UDP");
+				
+				
 				ClientInformation client = clients.get(packet.senderUuid);
-				System.out.println("Sender UUID UDP: " + packet.senderUuid);
 				
-				if (client == null) continue;
-				System.out.println("Client: " + client.getIpAddress() + ", uuid: " + client.getUuid());
+				if (client == null) { //If first packet was UDP, we create the ClientInformation.
+					client = new ClientInformation(udpSocket.getInetAddress(), udpSocket.getPort(), packet.senderUuid, packetRegistry);
+					addClient(client);
+				}
 				
-				if (client.getUdpPort() == -1) {
+				System.out.println("[Server] Client: " + client.getIpAddress() + ", uuid: " + client.getUuid());
+				
+				if (client.getUdpPort() == -1) { //If client was created by TCP, we add the UDP port.
 					client.setUdpPort(udpPacket.getPort());
 				}
 				
-				//TODO: Should this be before or after callHandler()?
-				//TODO: Should the callHandler be called if server is not in the targets?
-				List<ClientInformation> recipients = targetRegistry.resolve(packet.target);
-				sendToTargets(recipients, packet, Protocol.UDP);
-				
-				System.out.println("sent forward");
-				
-				packetRegistry.callHandler(packet); //TODO: Should these create new threads? (ChatGPT thinks it's not necessary, and this guarantees sequential execution.)
-													//Could add boolean heavyTask to Packet, and only create threads for heavy tasks, or just let handlers create threads.
-				System.out.println("called a handler!");
-			} catch (IOException e) {
-				e.printStackTrace(System.err);
+				handlePacket(packet, Protocol.UDP);
 			}
+		} catch (SocketException e) {
+			System.out.println("[Server] Socket was closed UDP! Stopping listener.");
+		} catch (IOException e) {
+			e.printStackTrace(System.err);
 		}
+	}
+	
+	private void handlePacket(Packet packet, Protocol protocol) {
+		//TODO: Should the callHandler be called if server is not in the targets? (Maybe just have server handle all packets no matter the target)
+		packetRegistry.callHandler(packet); //TODO: Should these create new threads? (ChatGPT thinks it's not necessary, and this guarantees sequential execution.)
+											//Could add boolean heavyTask to Packet, and only create threads for heavy tasks, or just let handlers create threads.
+		
+		List<ClientInformation> targetClients = targetRegistry.resolveTargets(packet.target);
+		sendToTargets(targetClients, packet, protocol);
 	}
 	
 	public Collection<ClientInformation> getClients() {
@@ -174,8 +175,20 @@ public class Server {
 		return hostClient;
 	}
 	
-	public void sendToTargets(List<? extends HasUUID> targets, Packet packet, Protocol protocol) { //TODO: prevent sending back to original client
+	public PacketRegistry getPacketRegistry() {
+		return packetRegistry;
+	}
+	
+	public TargetRegistry getTargetRegistry() {
+		return targetRegistry;
+	}
+	
+	public void sendToTargets(List<? extends HasUUID> targets, Packet packet, Protocol protocol) {
 		for (HasUUID target : targets) {
+			if (target.getUuid().equals(packet.senderUuid)) { //Don't send packet back to sender.
+				continue;
+			}
+			
 			sendPacket(target.getUuid(), packet, protocol);
 		}
 	}
@@ -226,5 +239,31 @@ public class Server {
 		}
 	}
 	
-	//TODO: Create stop() method.
+	private void addClient(ClientInformation client) {
+		synchronized (clients) {
+			if (clients.isEmpty()) {
+				hostClient = client; //First client that connects is the host.
+			}
+			clients.put(client.getUuid(), client);
+			System.out.println("[Server] Client added!");
+		}
+	}
+	
+	public void stop() {
+		running = false;
+		try {
+			synchronized (clients) {
+				for (ClientInformation client : clients.values()) {
+					client.getTcpSocket().close();
+				}
+				clients.clear();
+			}
+			tcpSocket.close();
+			udpSocket.close();
+		} catch (IOException e) {
+			e.printStackTrace(System.err);
+		}
+		
+		System.out.println("Server stopped.");
+	}
 }

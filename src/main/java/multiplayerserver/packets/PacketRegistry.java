@@ -9,14 +9,22 @@ import java.util.function.Consumer;
  * Tracks all the different packet classes, has packet specific handlers, and serializes and parses packets.
  */
 public class PacketRegistry {
-	private final Gson gson = new Gson();
-	
 	private final Map<String, Class<? extends Packet>> classNameToClass = new HashMap<>();
     private final Map<Class<? extends Packet>, String> classToClassName = new HashMap<>();
 	private final Map<Class<? extends Packet>, Consumer<? extends Packet>> handlers = new HashMap<>();
 	
 	private Consumer<Packet> defaultHandler;
     private Consumer<Packet> globalHandler;
+	
+	private final Gson gson = new Gson();
+	
+	public PacketRegistry() {
+		registerBuiltInPackets();
+	}
+	
+	private void registerBuiltInPackets() {
+		registerPacket(SendUuid.class);
+	}
 	
 	/**
 	 * Register a packet for serialization and parsing.
