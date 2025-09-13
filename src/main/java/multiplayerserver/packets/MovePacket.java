@@ -11,6 +11,7 @@ public class MovePacket extends Packet {
 	}
 	
 	public MovePacket(int x, int y, Target target) {
+		super(target);
 		this.x = x;
 		this.y = y;
 	}

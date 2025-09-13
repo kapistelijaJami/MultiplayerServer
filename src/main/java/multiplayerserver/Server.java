@@ -16,6 +16,7 @@ import java.util.Map;
 import java.util.UUID;
 import multiplayerserver.packets.Packet;
 import multiplayerserver.packets.PacketRegistry;
+import multiplayerserver.packets.SendUuid;
 import multiplayerserver.targets.TargetRegistry;
 
 public class Server {
@@ -76,7 +77,7 @@ public class Server {
 	}
 	
 	private void tcpClientLoop(ClientInformation client) {
-		System.out.println("[Server] Listening inputStream!");
+		System.out.println("[Server] Listening InputStream!");
 		
 		try (Socket socket = client.getTcpSocket();
 				InputStream in = socket.getInputStream();
@@ -101,6 +102,12 @@ public class Server {
 					client = clients.get(client.getUuid());
 					client.setTcpSocket(temp.getTcpSocket());
 					System.out.println("[Server] TCP socket set!");
+				}
+				
+				//If packet was SendUuid, then we can set udpPort too.
+				if (packet instanceof SendUuid) {
+					SendUuid p = (SendUuid) packet;
+					client.setUdpPort(p.udpPort);
 				}
 				
 				System.out.println("[Server] Client: " + client.getIpAddress() + ", uuid: " + client.getUuid());
@@ -163,8 +170,12 @@ public class Server {
 		packetRegistry.callHandler(packet); //TODO: Should these create new threads? (ChatGPT thinks it's not necessary, and this guarantees sequential execution.)
 											//Could add boolean heavyTask to Packet, and only create threads for heavy tasks, or just let handlers create threads.
 		
-		List<ClientInformation> targetClients = targetRegistry.resolveTargets(packet.target);
+		List<? extends HasUUID> targetClients = targetRegistry.resolveTargets(packet.target);
 		sendToTargets(targetClients, packet, protocol);
+	}
+	
+	public ClientInformation getClient(UUID uuid) {
+		return clients.get(uuid);
 	}
 	
 	public Collection<ClientInformation> getClients() {
@@ -175,6 +186,19 @@ public class Server {
 		return hostClient;
 	}
 	
+	public void setHostClient(UUID uuid) {
+		ClientInformation client = clients.get(uuid);
+		if (client == null) {
+			System.err.println("Client doesn't exist!");
+		} else {
+			hostClient = client;
+		}
+	}
+	
+	public void setHostClient(HasUUID obj) {
+		setHostClient(obj.getUuid());
+	}
+	
 	public PacketRegistry getPacketRegistry() {
 		return packetRegistry;
 	}
@@ -183,6 +207,13 @@ public class Server {
 		return targetRegistry;
 	}
 	
+	/**
+	 * Sends to all targets in the list, except the packet's original sender.
+	 * Can take a list of any objects that implement HasUUID interface.
+	 * @param targets
+	 * @param packet
+	 * @param protocol
+	 */
 	public void sendToTargets(List<? extends HasUUID> targets, Packet packet, Protocol protocol) {
 		for (HasUUID target : targets) {
 			if (target.getUuid().equals(packet.senderUuid)) { //Don't send packet back to sender.

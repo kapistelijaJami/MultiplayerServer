@@ -49,7 +49,7 @@ public class Client implements HasUUID {
 			new Thread(this::listenTCP).start();
 			new Thread(this::listenUDP).start();
 			
-			sendPacket(new SendUuid(uuid), Protocol.TCP);
+			sendPacket(new SendUuid(uuid, udpSocket.getLocalPort()), Protocol.TCP); //Sending UUID and udpPort to the server.
 		} catch (IOException e) {
 			e.printStackTrace(System.err);
 		}

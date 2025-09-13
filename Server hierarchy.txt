@@ -1,6 +1,6 @@
 MultiplayerServer
 │
-├─ Packet.java
+├─ Packet
 │   ├─ Fields:
 │   │   ├─ UUID senderUuid
 │   │   └─ Target target
@@ -10,7 +10,7 @@ MultiplayerServer
 │   │   ├─ Packet(Target target)
 │   │   └─ Packet(UUID senderUuid, Target target)
 │
-├─ PacketRegistry.java
+├─ PacketRegistry
 │   ├─ Fields:
 │   │   ├─ Map<String, Class<? extends Packet>> classNameToClass
 │   │   ├─ Map<Class<? extends Packet>, String> classToClassName
@@ -29,7 +29,7 @@ MultiplayerServer
 │   │   ├─ Packet parsePacket(String payload)
 │   │   └─ void callHandler(Packet packet)
 │
-├─ Server.java
+├─ Server
 │   ├─ Fields:
 │   │   ├─ int serverPort
 │   │   ├─ ServerSocket tcpSocket
@@ -46,8 +46,11 @@ MultiplayerServer
 │   │   ├─ void tcpClientLoop(ClientInformation client)
 │   │   ├─ void udpReceiveLoop()
 │   │   ├─ void handlePacket(Packet packet, Protocol protocol)
+│   │   ├─ ClientInformation getClient(UUID uuid)
 │   │   ├─ Collection<ClientInformation> getClients()
 │   │   ├─ ClientInformation getHostClient()
+│   │   ├─ void setHostClient(UUID uuid)
+│   │   ├─ void setHostClient(HasUUID obj)
 │   │   ├─ PacketRegistry getPacketRegistry()
 │   │   ├─ TargetRegistry getTargetRegistry()
 │   │   ├─ void sendToTargets(List<? extends HasUUID> targets, Packet packet, Protocol protocol)
@@ -60,7 +63,7 @@ MultiplayerServer
 │   │   ├─ void addClient(ClientInformation client)
 │   │   └─ void stop()
 │
-├─ ClientInformation.java
+├─ ClientInformation implements HasUUID
 │   ├─ Fields:
 │   │   ├─ InetAddress ipAddress
 │   │   ├─ Socket tcpSocket
@@ -79,7 +82,7 @@ MultiplayerServer
 │   │   ├─ UUID getUuid()
 │   │   └─ void sendTCP(Packet packet)
 │
-├─ Client.java
+├─ Client
 │   ├─ Fields:
 │   │   ├─ InetAddress serverIP
 │   │   ├─ int serverPort
@@ -99,26 +102,39 @@ MultiplayerServer
 │   │   ├─ UUID getUuid()
 │   │   └─ void stop()
 │
-├─ Target.java
+├─ Target
 │   ├─ Fields:
 │   │   ├─ String name
-│   ├─ Constructors:
-│   │   ├─ Packet()
-│   │   ├─ Packet(UUID senderUuid)
-│   │   ├─ Packet(Target target)
-│   │   └─ Packet(UUID senderUuid, Target target)
+│   │   └─ UUID uuid
+│   ├─ Methods:
+│   │   ├─ Target(String groupName)
+│   │   ├─ Target(UUID uuid)
+│   │   ├─ String getGroupName()
+│   │   └─ UUID getUuid()
 │   ├─ Static Fields:
 │   │   ├─ Target ALL
 │   │   ├─ Target SERVER
 │   │   ├─ Target HOST_CLIENT
-│   │   └─ Target ALL_BUT_HOST_CLIENT
+│   │   ├─ Target ALL_BUT_HOST_CLIENT
+│   │   └─ Target UUID
 │
-├─ TargetRegistry.java
+├─ TargetRegistry
 │   ├─ Fields:
-│   │   └─ Map<String, Function<Server, List<ClientInformation>>> resolvers
+│   │   ├─ Map<String, BiFunction<Server, Target, List<HasUUID>>> resolvers
+│   │   └─ Server server
 │   ├─ Methods:
 │   │   ├─ TargetRegistry(Server server)
 │   │   ├─ void registerBuiltInTargets()
-│   │   ├─ void register(Target target, Function<Server, List<ClientInformation>> resolver)
-│   │   ├─ List<ClientInformation> resolveTargets(Target target)
+│   │   ├─ void register(Target target, BiFunction<Server, Target, List<HasUUID>> resolver)
+│   │   ├─ List<HasUUID> resolveTargets(Target target)
 │   │   └─ void sendToTargets(List<? extends HasUUID> targets, Packet packet, Protocol protocol)
+│
+├─ SendUuid extends Packet
+│   ├─ Fields:
+│   │   └─ int udpPort
+│   ├─ Constructors:
+│   │   └─ SendUuid(UUID uuid, int udpPort)
+│
+├─ HasUUID (interface)
+│   ├─ Methods:
+│   │   └─ UUID getUuid()
