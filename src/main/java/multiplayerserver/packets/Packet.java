@@ -5,7 +5,7 @@ import multiplayerserver.targets.Target;
 
 public abstract class Packet {
 	public UUID senderUuid;
-	public Target target;
+	public Target[] targets;
 	
 	public Packet() {}
 	
@@ -13,12 +13,12 @@ public abstract class Packet {
 		this.senderUuid = senderUuid;
     }
 	
-	public Packet(Target target) { //TODO: should this still be Target... or just a single Target?
-		this.target = target;
+	public Packet(Target... targets) {
+		this.targets = targets;
     }
 	
-	public Packet(UUID senderUuid, Target target) { //TODO: should this still be Target... or just a single Target?
+	public Packet(UUID senderUuid, Target... targets) {
 		this.senderUuid = senderUuid;
-		this.target = target;
+		this.targets = targets;
     }
 }

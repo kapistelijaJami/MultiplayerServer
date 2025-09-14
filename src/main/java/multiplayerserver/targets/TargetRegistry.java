@@ -5,6 +5,8 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
+import java.util.UUID;
 import java.util.function.BiFunction;
 import java.util.stream.Collectors;
 import multiplayerserver.ClientInformation;
@@ -61,9 +63,9 @@ public class TargetRegistry {
         resolvers.put(target.getGroupName(), resolver);
     }
 	
-	public <T extends HasUUID> List<T> resolveTargets(Target target) {
-		if (target == null) { //TODO: See if we want to do null checking, or if we want to do something else when target is null, probably messages meant for server will be null.
-			return Collections.emptyList();
+	private <T extends HasUUID> List<T> resolveTargets(Target target) {
+		if (target == null) {
+			return new ArrayList<>();
 		}
 		
         BiFunction<Server, Target, List<? extends HasUUID>> resolver = resolvers.get(target.getGroupName());
@@ -75,7 +77,32 @@ public class TargetRegistry {
         return (List<T>) resolver.apply(server, target);
     }
 	
+	public <T extends HasUUID> List<T> resolveTargets(Target... targets) {
+		if (targets == null || targets.length == 0) {
+			return new ArrayList<>();
+		}
+		
+		List<T> list = new ArrayList<>();
+		
+		for (Target target : targets) {
+			addAllIfAbsent(list, resolveTargets(target));
+		}
+		return list;
+	}
+	
+	private <T extends HasUUID> void addAllIfAbsent(List<T> list, List<T> newItems) {
+		Set<UUID> existing = list.stream()
+				.map(newItem -> newItem.getUuid())
+				.collect(Collectors.toSet());
+		
+		for (T newItem : newItems) {
+			if (existing.add(newItem.getUuid())) { //Add returns false if already present
+				list.add(newItem);
+			}
+		}
+	}
+	
 	public void sendToTargets(List<? extends HasUUID> targets, Packet packet, Protocol protocol) {
-		server.sendToTargets(targets, packet, protocol);
+		server.sendToClients(targets, packet, protocol);
 	}
 }

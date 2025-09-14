@@ -9,7 +9,6 @@ import java.net.DatagramSocket;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.net.SocketException;
-import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
 import java.util.ArrayList;
@@ -172,8 +171,8 @@ public class Server {
 		packetRegistry.callHandler(packet); //TODO: Should these create new threads? (ChatGPT thinks it's not necessary, and this guarantees sequential execution.)
 											//Could add boolean heavyTask to Packet, and only create threads for heavy tasks, or just let handlers create threads.
 		
-		List<? extends HasUUID> targetClients = targetRegistry.resolveTargets(packet.target);
-		sendToTargets(targetClients, packet, protocol);
+		List<? extends HasUUID> targetClients = targetRegistry.resolveTargets(packet.targets);
+		sendToClients(targetClients, packet, protocol);
 	}
 	
 	public ClientInformation getClient(UUID uuid) {
@@ -217,19 +216,19 @@ public class Server {
 	}
 	
 	/**
-	 * Sends to all targets in the list, except the packet's original sender.
+	 * Sends to all clients in the list, except the packet's original sender.
 	 * Can take a list of any objects that implement HasUUID interface.
-	 * @param targets
+	 * @param clients
 	 * @param packet
 	 * @param protocol
 	 */
-	public void sendToTargets(List<? extends HasUUID> targets, Packet packet, Protocol protocol) {
-		for (HasUUID target : targets) {
-			if (target.getUuid().equals(packet.senderUuid)) { //Don't send packet back to sender.
+	public void sendToClients(List<? extends HasUUID> clients, Packet packet, Protocol protocol) {
+		for (HasUUID client : clients) {
+			if (client.getUuid().equals(packet.senderUuid)) { //Don't send packet back to sender.
 				continue;
 			}
 			
-			sendPacket(target.getUuid(), packet, protocol);
+			sendPacket(client.getUuid(), packet, protocol);
 		}
 	}
 	

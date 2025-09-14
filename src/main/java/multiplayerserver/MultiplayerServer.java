@@ -81,7 +81,6 @@ public class MultiplayerServer {
 	
 	public static void handlePacket(MovePacket packet) {
 		System.out.println("Packet received! " + packet.x + ", " + packet.y);
-		
 	}
 	
 	public static void handlePacket(PingPacket packet, Server server) {
