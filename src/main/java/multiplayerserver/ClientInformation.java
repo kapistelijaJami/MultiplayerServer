@@ -83,6 +83,4 @@ public class ClientInformation implements HasUUID {
 			e.printStackTrace(System.err);
 		}
 	}
-	
-	//TODO: Maybe add sendUDP here too? Would need to keep track of udpSocket, which is not client specific. All clients would share the same one.
 }

@@ -182,7 +182,7 @@ public class Server {
 	 * @param protocol 
 	 */
 	private void handlePacket(Packet packet, Protocol protocol) {
-		//TODO: Should the callHandler be called if server is not in the targets? (Maybe just have server handle all packets no matter the target)
+		//TODO: Should the callHandler be called if server is not in the targets? (Maybe just have server handle all packets no matter the target, like it is now)
 		packetRegistry.callHandler(packet); //TODO: Should these create new threads? (ChatGPT thinks it's not necessary, and this guarantees sequential execution.)
 											//Could add boolean heavyTask to Packet, and only create threads for heavy tasks, or just let handlers create threads.
 		
