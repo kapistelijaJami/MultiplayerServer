@@ -1,9 +1,12 @@
 package multiplayerserver;
 
+import java.net.BindException;
 import java.net.InetAddress;
 import java.net.UnknownHostException;
 import java.util.Scanner;
 import java.util.UUID;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 import multiplayerserver.packets.MovePacket;
 import multiplayerserver.packets.PacketRegistry;
 import multiplayerserver.packets.PingPacket;
@@ -23,7 +26,11 @@ public class MultiplayerServer {
 			packetRegistryServer.registerPacket(MovePacket.class);
 			packetRegistryServer.registerHandler(PingPacket.class, p -> MultiplayerServer.handlePacket(p, server));
 			
-			server.start();
+			try {
+				server.start();
+			} catch (BindException e) {
+				return;
+			}
 			
 			try {
 				PacketRegistry packetRegistryClient = new PacketRegistry();

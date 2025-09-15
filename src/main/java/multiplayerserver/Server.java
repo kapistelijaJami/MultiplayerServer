@@ -5,6 +5,7 @@ import java.io.DataInputStream;
 import java.io.EOFException;
 import java.io.IOException;
 import java.io.InputStream;
+import java.net.BindException;
 import java.net.DatagramPacket;
 import java.net.DatagramSocket;
 import java.net.ServerSocket;
@@ -44,7 +45,7 @@ public class Server {
 		targetRegistry = new TargetRegistry(this);
 	}
 	
-	public void start() {
+	public void start() throws BindException {
 		try {
 			running = true;
 			
@@ -55,6 +56,9 @@ public class Server {
 			
 			new Thread(this::tcpAcceptLoop).start();
 			new Thread(this::udpReceiveLoop).start();
+		} catch (BindException e) {
+			printMessage("ADDRESS ALREADY IN USE");
+			throw e;
 		} catch (IOException e) {
 			e.printStackTrace(System.err);
 		}
