@@ -101,7 +101,7 @@ public class Server {
 				
 				if (!packetRegistry.isPacketRegistered(payload)) { //If the packet isn't registered on the server we can still forward it to other clients.
 					Packet basePacket = packetRegistry.parseAsBasePacket(payload);
-					forwardPayload(basePacket, payload, Protocol.UDP);
+					forwardPayload(basePacket, payload, Protocol.TCP);
 					continue;
 				}
 				
