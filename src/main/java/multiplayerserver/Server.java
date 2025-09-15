@@ -101,8 +101,12 @@ public class Server {
 				String payload = new String(packetData);
 				
 				if (!packetRegistry.isPacketRegistered(payload)) { //If the packet isn't registered on the server we can still forward it to other clients.
-					Packet basePacket = packetRegistry.parseAsBasePacket(payload);
-					forwardPayload(basePacket, payload, Protocol.TCP);
+					try {
+						Packet basePacket = packetRegistry.parseAsBasePacket(payload);
+						forwardPayload(basePacket, payload, Protocol.TCP);
+					} catch (JsonSyntaxException e) {
+						e.printStackTrace(System.err);
+					}
 					continue;
 				}
 				
@@ -156,8 +160,12 @@ public class Server {
 				String payload = new String(udpPacket.getData(), 0, udpPacket.getLength());
 				
 				if (!packetRegistry.isPacketRegistered(payload)) { //If the packet isn't registered on the server we can still forward it to other clients.
-					Packet basePacket = packetRegistry.parseAsBasePacket(payload);
-					forwardPayload(basePacket, payload, Protocol.UDP);
+					try {
+						Packet basePacket = packetRegistry.parseAsBasePacket(payload);
+						forwardPayload(basePacket, payload, Protocol.UDP);
+					} catch (JsonSyntaxException e) {
+						e.printStackTrace(System.err);
+					}
 					continue;
 				}
 				

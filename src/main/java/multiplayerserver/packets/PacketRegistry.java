@@ -158,7 +158,7 @@ public class PacketRegistry {
 		return classNameToClass.containsKey(parts[0]);
 	}
 	
-	public Packet parseAsBasePacket(String payload) {
+	public Packet parseAsBasePacket(String payload) throws JsonSyntaxException {
 		String[] parts = payload.split(":", 2);
 		return gson.fromJson(parts[1], BasePacket.class);
 	}
