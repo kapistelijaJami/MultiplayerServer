@@ -28,11 +28,15 @@ public class Client implements HasUUID {
 	private boolean running = false;
 	
 	public Client(InetAddress serverIP, int serverPort, PacketRegistry registry) {
+		this(serverIP, serverPort, UUID.randomUUID(), registry);
+	}
+	
+	public Client(InetAddress serverIP, int serverPort, UUID uuid, PacketRegistry registry) {
 		this.serverIP = serverIP;
 		this.serverPort = serverPort;
 		this.packetRegistry = registry;
 		
-		this.uuid = UUID.randomUUID();
+		this.uuid = uuid;
 	}
 	
 	public void connect() {
@@ -44,7 +48,7 @@ public class Client implements HasUUID {
 			
 			udpSocket = new DatagramSocket();
 			udpSocket.connect(serverIP, serverPort);
-			System.out.println("[Client] Client connected!");
+			printMessage("Client connected!");
 			
 			new Thread(this::listenTCP).start();
 			new Thread(this::listenUDP).start();
@@ -56,30 +60,27 @@ public class Client implements HasUUID {
 	}
 	
 	private void listenTCP() {
-		System.out.println("[Client] Listening TCP!");
+		printMessage("Listening TCP!");
 		
 		try (InputStream in = tcpSocket.getInputStream();
 				DataInputStream dataInput = new DataInputStream(in)) {
 			
 			while (running) {
 				int packetLength = dataInput.readInt();
-				System.out.println("[Client] Received packet length TCP: " + packetLength);
 				byte[] packetData = new byte[packetLength];
 				dataInput.readFully(packetData);
-				System.out.println("[Client] Received packet TCP");
 				
 				String payload = new String(packetData);
-				System.out.println("[Client] Payload: " + payload);
 				
 				Packet packet = packetRegistry.parsePacket(payload);
-				System.out.println("[Client] Packet parsed!");
 				
 				packetRegistry.callHandler(packet);
 			}
 		} catch (EOFException e) {
-			System.out.println("[Client] Server closed connection TCP. Stopping listener."); //TODO: Could stop the whole client as well?
+			printMessage("Server closed connection TCP. Stopping listener.");
+			stop(); //Stopping whole client if the connection ended.
         } catch (SocketException e) {
-			System.out.println("[Client] Connection closed TCP. Stopping listener.");
+			printMessage("Connection closed TCP. Stopping listener.");
 		} catch (IOException e) {
 			e.printStackTrace(System.err);
 		}
@@ -89,7 +90,7 @@ public class Client implements HasUUID {
 		byte[] data = new byte[1024];
 		DatagramPacket udpPacket = new DatagramPacket(data, data.length);
 		
-		System.out.println("[Client] Listening UDP!");
+		printMessage("Listening UDP!");
 		
 		try {
 			while (running) {
@@ -102,14 +103,13 @@ public class Client implements HasUUID {
 				packetRegistry.callHandler(packet);
 			}
 		} catch (SocketException e) {
-			System.out.println("[Client] Connection closed UDP. Stopping listener.");
+			printMessage("Connection closed UDP. Stopping listener.");
 		} catch (IOException e) {
 			e.printStackTrace(System.err);
 		}
 	}
 	
 	public void sendPacket(Packet packet, Protocol protocol) {
-		System.out.println("[Client] Sending packet! Protocol: " + protocol);
 		if (protocol == Protocol.TCP) {
 			sendTCP(packet);
 		} else if (protocol == Protocol.UDP) {
@@ -123,6 +123,8 @@ public class Client implements HasUUID {
 			if (packet.senderUuid == null) { //Client can ignore uuid, it will be set here.
 				packet.senderUuid = getUuid();
 			}
+			packet.protocol = Protocol.TCP; //Also set protocol before sending.
+			
 			OutputStream out = tcpSocket.getOutputStream();
 			
 			String payload = packetRegistry.serialize(packet);
@@ -141,6 +143,8 @@ public class Client implements HasUUID {
 			if (packet.senderUuid == null) { //Client can ignore uuid, it will be set here.
 				packet.senderUuid = getUuid();
 			}
+			packet.protocol = Protocol.UDP; //Also set protocol before sending.
+			
 			String payload = packetRegistry.serialize(packet);
 			byte[] data = payload.getBytes();
 			
@@ -165,6 +169,14 @@ public class Client implements HasUUID {
 			e.printStackTrace(System.err);
 		}
 		
-		System.out.println("Client stopped.");
+		printMessage("Client stopped.");
+	}
+
+	public boolean isRunning() {
+		return running;
+	}
+	
+	public void printMessage(String message) {
+		System.out.println("[Client] " + message);
 	}
 }

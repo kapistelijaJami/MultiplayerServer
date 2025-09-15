@@ -3,34 +3,36 @@ package multiplayerserver.targets;
 import java.util.UUID;
 
 public class Target {
-	private final String groupName;
-	private UUID uuid;
+	private final String type; //This is the main group name, has to be unique
+	private final String value; //Can store other information here, for example UUID, or team id etc.
 	
-	public Target(String groupName) {
-        this.groupName = groupName;
+	public Target(String type) {
+        this(type, null);
     }
 	
-	/**
-	 * Sends packet to specific UUID.
-	 * These don't need to be registered in TargetRegistry.
-	 * @param uuid 
-	 */
-	public Target(UUID uuid) {
-		this.groupName = "specificUuid";
-        this.uuid = uuid;
+	public Target(String type, String value) {
+        this.type = type;
+        this.value = value;
     }
 	
-	public String getGroupName() {
-		return groupName;
+	public String getType() {
+		return type;
 	}
 	
-	public UUID getUuid() {
-		return uuid;
+	public String getValue() {
+		return value;
 	}
 	
 	public static final Target ALL = new Target("all");
     public static final Target SERVER = new Target("server");
     public static final Target HOST_CLIENT = new Target("hostClient");
     public static final Target ALL_BUT_HOST_CLIENT = new Target("allButHostClient");
-    public static final Target UUID = new Target("specificUuid");
+	
+	public static Target createUUIDTarget(UUID uuid) {
+		if (uuid == null) { //Can be null when registering the Target
+			return new Target("UUIDTarget", null);
+		}
+		
+		return new Target("UUIDTarget", uuid.toString());
+	}
 }

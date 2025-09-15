@@ -10,7 +10,6 @@ import java.util.function.Consumer;
  */
 public class PacketRegistry {
 	private final Map<String, Class<? extends Packet>> classNameToClass = new HashMap<>();
-    private final Map<Class<? extends Packet>, String> classToClassName = new HashMap<>();
 	private final Map<Class<? extends Packet>, Consumer<? extends Packet>> handlers = new HashMap<>();
 	
 	private Consumer<Packet> defaultHandler;
@@ -28,10 +27,11 @@ public class PacketRegistry {
 	
 	/**
 	 * Register a packet for serialization and parsing.
+	 * Server doesn't need to register packets that are just forwarded to clients.
 	 * Need to call registerHandler() if you want to react to receiving a packet type.
 	 * Don't need to call this if you call registerHandler().
 	 * 
-	 * Packet classes need to extend Packet.
+	 * Custom packet classes need to extend Packet.
 	 * <p>
 	 * Usage:
 	 * <pre>
@@ -42,16 +42,16 @@ public class PacketRegistry {
 	 * @param clazz 
 	 */
 	public <T extends Packet> void registerPacket(Class<T> clazz) {
-        if (classToClassName.containsKey(clazz)) return;
+        if (classNameToClass.containsKey(clazz.getName())) return;
 		
 		String className = clazz.getName();
-        classToClassName.put(clazz, className);
         classNameToClass.put(className, clazz);
     }
 	
 	/**
 	 * Register a packet and set a handler for that packet type.
 	 * Needs to be called for all the packets you want to handle in that client/server.
+	 * Server doesn't need to register packets that are just forwarded to clients.
 	 * Use separate PacketRegistry for server and clients.
 	 * <p>
 	 * If you don't want to handle a packet, but want to be able to serialize it (for sending)
@@ -87,7 +87,8 @@ public class PacketRegistry {
 	 *  <code>registry.registerHandler(MovePacket.class, move -> game.movePlayer(move));</code>
 	 *  <code>registry.registerHandler(ChatPacket.class, packetHandler::addChatMessage);</code>
 	 * </pre>
-	 * <code>handlerFunction</code> can also be null, in which case you can set up global handler function, or a default handler function.
+	 * <code>handlerFunction</code> can also be null (or just call registerPacket), in
+	 * which case you can set up global handler function, or a default handler function.
 	 * You can also use only the global function.
 	 * @param <T>
 	 * @param clazz 
@@ -96,9 +97,8 @@ public class PacketRegistry {
 	public <T extends Packet> void registerHandler(Class<T> clazz, Consumer<T> handler) {
 		if (handlers.containsKey(clazz)) return;
 		
-		if (!classToClassName.containsKey(clazz)) {
+		if (!classNameToClass.containsKey(clazz.getName())) {
 			String className = clazz.getName();
-			classToClassName.put(clazz, className);
 			classNameToClass.put(className, clazz);
 		}
         handlers.put(clazz, handler);
@@ -128,12 +128,8 @@ public class PacketRegistry {
 	 * @return 
 	 */
 	public String serialize(Packet packet) {
-        String className = classToClassName.get(packet.getClass());
-		if (className == null) {
-			throw new IllegalArgumentException("Cannot serialize! Packet not registered: " + packet.getClass());
-		}
         String json = gson.toJson(packet, packet.getClass());
-        return className + ":" + json;
+        return packet.getClass().getName() + ":" + json;
     }
 	
 	/**
@@ -154,6 +150,16 @@ public class PacketRegistry {
 		}
 		
 		return gson.fromJson(parts[1], clazz);
+	}
+	
+	public boolean isPacketRegistered(String payload) {
+		String[] parts = payload.split(":", 2);
+		return classNameToClass.containsKey(parts[0]);
+	}
+	
+	public Packet parseAsBasePacket(String payload) {
+		String[] parts = payload.split(":", 2);
+		return gson.fromJson(parts[1], BasePacket.class);
 	}
 	
 	/**

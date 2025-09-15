@@ -1,5 +1,6 @@
 package multiplayerserver;
 
+import com.google.gson.Gson;
 import java.io.DataInputStream;
 import java.io.EOFException;
 import java.io.IOException;
@@ -18,6 +19,7 @@ import java.util.stream.Collectors;
 import multiplayerserver.packets.Packet;
 import multiplayerserver.packets.PacketRegistry;
 import multiplayerserver.packets.SendUuid;
+import multiplayerserver.targets.ResolveContext;
 import multiplayerserver.targets.TargetRegistry;
 
 public class Server {
@@ -28,26 +30,28 @@ public class Server {
 	private final Map<UUID, ClientInformation> clients = new HashMap<>();
 	private final PacketRegistry packetRegistry;
 	private TargetRegistry targetRegistry;
+	private Gson gson = new Gson();
 	
 	private ClientInformation hostClient;
 	
 	private boolean running = false;
 	
+	
 	public Server(int serverPort, PacketRegistry registry) {
 		this.serverPort = serverPort;
 		this.packetRegistry = registry;
+		
+		targetRegistry = new TargetRegistry(this);
 	}
 	
 	public void start() {
 		try {
 			running = true;
 			
-			targetRegistry = new TargetRegistry(this);
-			
 			tcpSocket = new ServerSocket(serverPort);
 			udpSocket = new DatagramSocket(serverPort);
 			
-			System.out.println("[Server] Server started!");
+			printMessage("Server started!");
 			
 			new Thread(this::tcpAcceptLoop).start();
 			new Thread(this::udpReceiveLoop).start();
@@ -57,19 +61,19 @@ public class Server {
 	}
 	
 	private void tcpAcceptLoop() {
-		System.out.println("[Server] Listening TCP!");
+		printMessage("Listening TCP!");
 		
 		while (running) {
 			try {
 				Socket clientSocket = tcpSocket.accept();
 				clientSocket.setKeepAlive(true);
-				System.out.println("[Server] New client connected: " + clientSocket.getRemoteSocketAddress());
+				printMessage("New client connected: " + clientSocket.getRemoteSocketAddress());
 				
 				ClientInformation client = new ClientInformation(clientSocket, packetRegistry);
                 
 				new Thread(() -> tcpClientLoop(client)).start();
 			} catch (SocketException e) {
-				System.out.println("[Server] ServerSocket closed! Stopping listener.");
+				printMessage("ServerSocket closed! Stopping listener.");
 				break;
 			} catch (IOException e) {
 				e.printStackTrace(System.err);
@@ -78,7 +82,7 @@ public class Server {
 	}
 	
 	private void tcpClientLoop(ClientInformation client) {
-		System.out.println("[Server] Listening InputStream!");
+		printMessage("Listening InputStream!");
 		
 		try (Socket socket = client.getTcpSocket();
 				InputStream in = socket.getInputStream();
@@ -88,11 +92,16 @@ public class Server {
 				int packetLength = dataInput.readInt();
 				byte[] packetData = new byte[packetLength];
 				dataInput.readFully(packetData);
-				System.out.println("[Server] Received packet TCP");
 				
 				String payload = new String(packetData);
+				
+				if (!packetRegistry.isPacketRegistered(payload)) { //If the packet isn't registered on the server we can still forward it to other clients.
+					Packet basePacket = packetRegistry.parseAsBasePacket(payload);
+					forwardPayload(basePacket, payload, Protocol.UDP);
+					continue;
+				}
+				
 				Packet packet = packetRegistry.parsePacket(payload);
-				System.out.println("[Server] Packet parsed!");
 				
 				if (client.getUuid() == null) { //First time receiving a packet, set uuid and add to clients list.
 					client.setUuid(packet.senderUuid);
@@ -102,7 +111,6 @@ public class Server {
 					ClientInformation temp = client;
 					client = clients.get(client.getUuid());
 					client.setTcpSocket(temp.getTcpSocket());
-					System.out.println("[Server] TCP socket set!");
 				}
 				
 				//If packet was SendUuid, then we can set udpPort too.
@@ -111,14 +119,12 @@ public class Server {
 					client.setUdpPort(p.udpPort);
 				}
 				
-				System.out.println("[Server] Client: " + client.getIpAddress() + ", uuid: " + client.getUuid());
-				
 				handlePacket(packet, Protocol.TCP);
 			}
 		} catch (EOFException e) {
-			System.out.println("[Server] Client disconnected normally TCP: " + client.getUuid());
+			printMessage("Client disconnected normally TCP: " + client.getUuid());
         } catch (SocketException e) {
-			System.out.println("[Server] Socket closed TCP!");
+			printMessage("Socket closed TCP!");
 		} catch (IOException e) {
 			e.printStackTrace(System.err);
 		}
@@ -132,17 +138,21 @@ public class Server {
 		byte[] data = new byte[1024];
 		DatagramPacket udpPacket = new DatagramPacket(data, data.length);
 		
-		System.out.println("[Server] Listening UDP!");
+		printMessage("Listening UDP!");
 		
 		try {
 			while (running) {
 				udpSocket.receive(udpPacket);
-				System.out.println("[Server] Received packet UDP");
 				
 				String payload = new String(udpPacket.getData(), 0, udpPacket.getLength());
-				Packet packet = packetRegistry.parsePacket(payload);
-				System.out.println("[Server] Packet parsed UDP");
 				
+				if (!packetRegistry.isPacketRegistered(payload)) { //If the packet isn't registered on the server we can still forward it to other clients.
+					Packet basePacket = packetRegistry.parseAsBasePacket(payload);
+					forwardPayload(basePacket, payload, Protocol.UDP);
+					continue;
+				}
+				
+				Packet packet = packetRegistry.parsePacket(payload);
 				
 				ClientInformation client = clients.get(packet.senderUuid);
 				
@@ -151,8 +161,6 @@ public class Server {
 					addClient(client);
 				}
 				
-				System.out.println("[Server] Client: " + client.getIpAddress() + ", uuid: " + client.getUuid());
-				
 				if (client.getUdpPort() == -1) { //If client was created by TCP, we add the UDP port.
 					client.setUdpPort(udpPacket.getPort());
 				}
@@ -160,19 +168,31 @@ public class Server {
 				handlePacket(packet, Protocol.UDP);
 			}
 		} catch (SocketException e) {
-			System.out.println("[Server] Socket was closed UDP! Stopping listener.");
+			printMessage("Socket was closed UDP! Stopping listener.");
 		} catch (IOException e) {
 			e.printStackTrace(System.err);
 		}
 	}
 	
+	/**
+	 * Handles the packet.
+	 * If handler is registered, it calls that.
+	 * Then it resolves the targets and sends it forwards if there were any.
+	 * @param packet
+	 * @param protocol 
+	 */
 	private void handlePacket(Packet packet, Protocol protocol) {
 		//TODO: Should the callHandler be called if server is not in the targets? (Maybe just have server handle all packets no matter the target)
 		packetRegistry.callHandler(packet); //TODO: Should these create new threads? (ChatGPT thinks it's not necessary, and this guarantees sequential execution.)
 											//Could add boolean heavyTask to Packet, and only create threads for heavy tasks, or just let handlers create threads.
 		
-		List<? extends HasUUID> targetClients = targetRegistry.resolveTargets(packet.targets);
+		List<? extends HasUUID> targetClients = targetRegistry.resolveTargets(new ResolveContext(this, packet), packet.targets);
 		sendToClients(targetClients, packet, protocol);
+	}
+	
+	private void forwardPayload(Packet packet, String payload, Protocol protocol) {
+		List<? extends HasUUID> targetClients = targetRegistry.resolveTargets(new ResolveContext(this, packet), packet.targets);
+		sendPayloadToClients(targetClients, packet.senderUuid, payload, protocol);
 	}
 	
 	public ClientInformation getClient(UUID uuid) {
@@ -192,6 +212,17 @@ public class Server {
 	
 	public ClientInformation getHostClient() {
 		return hostClient;
+	}
+	
+	public boolean isHostClient(UUID uuid) {
+		return isHostClient(clients.get(uuid));
+	}
+	
+	public boolean isHostClient(ClientInformation client) {
+		if (hostClient == null || client == null)
+			return false;
+		
+		return hostClient == client;
 	}
 	
 	public void setHostClient(UUID uuid) {
@@ -232,6 +263,16 @@ public class Server {
 		}
 	}
 	
+	public void sendPayloadToClients(List<? extends HasUUID> clients, UUID senderUuid, String payload, Protocol protocol) {
+		for (HasUUID client : clients) {
+			if (client.getUuid().equals(senderUuid)) { //Don't send packet back to sender.
+				continue;
+			}
+			
+			sendPayload(client.getUuid(), payload, protocol);
+		}
+	}
+	
 	public void sendPacket(UUID uuid, Packet packet, Protocol protocol) {
 		if (protocol == Protocol.TCP) {
 			sendTCP(uuid, packet);
@@ -248,6 +289,22 @@ public class Server {
 		}
 	}
 	
+	public void sendPayload(UUID uuid, String payload, Protocol protocol) {
+		if (protocol == Protocol.TCP) {
+			sendPayloadTCP(uuid, payload);
+		} else if (protocol == Protocol.UDP) {
+			sendPayloadUDP(uuid, payload);
+		}
+	}
+	
+	public void sendPayload(ClientInformation client, String payload, Protocol protocol) {
+		if (protocol == Protocol.TCP) {
+			sendPayloadTCP(client, payload);
+		} else if (protocol == Protocol.UDP) {
+			sendPayloadUDP(client, payload);
+		}
+	}
+	
 	private void sendTCP(UUID uuid, Packet packet) {
 		ClientInformation client = clients.get(uuid);
 		if (client == null) return;
@@ -259,6 +316,17 @@ public class Server {
 		client.sendTCP(packet);
 	}
 	
+	private void sendPayloadTCP(UUID uuid, String payload) {
+		ClientInformation client = clients.get(uuid);
+		if (client == null) return;
+		
+		sendPayloadTCP(client, payload);
+	}
+	
+	private void sendPayloadTCP(ClientInformation client, String payload) {
+		client.sendTCP(payload);
+	}
+	
 	private void sendUDP(UUID uuid, Packet packet) {
 		ClientInformation client = clients.get(uuid);
 		if (client == null) return;
@@ -267,8 +335,21 @@ public class Server {
 	}
 	
 	private void sendUDP(ClientInformation client, Packet packet) {
+		packet.protocol = Protocol.UDP; //Set protocol before sending.
+
+		String payload = packetRegistry.serialize(packet);
+		sendPayloadUDP(client, payload);
+	}
+	
+	private void sendPayloadUDP(UUID uuid, String payload) {
+		ClientInformation client = clients.get(uuid);
+		if (client == null) return;
+		
+		sendPayloadUDP(client, payload);
+	}
+	
+	private void sendPayloadUDP(ClientInformation client, String payload) {
 		try {
-			String payload = packetRegistry.serialize(packet);
 			byte[] data = payload.getBytes();
 			
 			DatagramPacket udpPacket = new DatagramPacket(data, data.length, client.getIpAddress(), client.getUdpPort());
@@ -284,7 +365,7 @@ public class Server {
 				hostClient = client; //First client that connects is the host.
 			}
 			clients.put(client.getUuid(), client);
-			System.out.println("[Server] Client added!");
+			printMessage("Client added!");
 		}
 	}
 	
@@ -303,6 +384,14 @@ public class Server {
 			e.printStackTrace(System.err);
 		}
 		
-		System.out.println("Server stopped.");
+		printMessage("Server stopped.");
+	}
+
+	public boolean isRunning() {
+		return running;
+	}
+	
+	public void printMessage(String message) {
+		System.out.println("[Server] " + message);
 	}
 }

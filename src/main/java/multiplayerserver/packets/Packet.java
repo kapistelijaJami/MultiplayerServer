@@ -1,10 +1,12 @@
 package multiplayerserver.packets;
 
 import java.util.UUID;
+import multiplayerserver.Protocol;
 import multiplayerserver.targets.Target;
 
 public abstract class Packet {
 	public UUID senderUuid;
+	public Protocol protocol;
 	public Target[] targets;
 	
 	public Packet() {}

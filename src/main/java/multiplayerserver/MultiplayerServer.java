@@ -3,6 +3,7 @@ package multiplayerserver;
 import java.net.InetAddress;
 import java.net.UnknownHostException;
 import java.util.Scanner;
+import java.util.UUID;
 import multiplayerserver.packets.MovePacket;
 import multiplayerserver.packets.PacketRegistry;
 import multiplayerserver.packets.PingPacket;
@@ -28,7 +29,7 @@ public class MultiplayerServer {
 				PacketRegistry packetRegistryClient = new PacketRegistry();
 				Client client = new Client(InetAddress.getByName("127.0.0.1"), Constants.SERVER_PORT, packetRegistryClient);
 				
-				packetRegistryClient.registerHandler(MovePacket.class, MultiplayerServer::handlePacket);
+				packetRegistryClient.registerHandler(MovePacket.class, p -> System.out.println("Host client received move packet!"));
 				
 				client.connect();
 			} catch (UnknownHostException e) {
@@ -57,7 +58,7 @@ public class MultiplayerServer {
 				
 				client.connect();
 				
-				client.sendPacket(new MovePacket(5, 10), Protocol.TCP);
+				client.sendPacket(new MovePacket(5, 10), Protocol.UDP);
 				
 				Thread.sleep(1000);
 				

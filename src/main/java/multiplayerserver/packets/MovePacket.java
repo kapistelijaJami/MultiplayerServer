@@ -10,8 +10,8 @@ public class MovePacket extends Packet {
 		this.y = y;
 	}
 	
-	public MovePacket(int x, int y, Target target) {
-		super(target);
+	public MovePacket(int x, int y, Target... targets) {
+		super(targets);
 		this.x = x;
 		this.y = y;
 	}

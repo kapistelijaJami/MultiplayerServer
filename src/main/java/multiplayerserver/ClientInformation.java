@@ -65,10 +65,15 @@ public class ClientInformation implements HasUUID {
 	}
 	
 	public void sendTCP(Packet packet) {
+		packet.protocol = Protocol.TCP; //Set protocol before sending.
+		
+		String payload = registry.serialize(packet);
+		sendTCP(payload);
+	}
+	
+	public void sendTCP(String payload) {
 		try {
 			OutputStream out = tcpSocket.getOutputStream();
-			
-			String payload = registry.serialize(packet);
 			byte[] data = payload.getBytes();
 			
 			out.write(ByteBuffer.allocate(Constants.PACKET_LENGTH_PREFIX_BYTES).putInt(data.length).array());
