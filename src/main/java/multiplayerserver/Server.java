@@ -1,6 +1,7 @@
 package multiplayerserver;
 
 import com.google.gson.Gson;
+import com.google.gson.JsonSyntaxException;
 import java.io.DataInputStream;
 import java.io.EOFException;
 import java.io.IOException;
@@ -105,25 +106,29 @@ public class Server {
 					continue;
 				}
 				
-				Packet packet = packetRegistry.parsePacket(payload);
-				
-				if (client.getUuid() == null) { //First time receiving a packet, set uuid and add to clients list.
-					client.setUuid(packet.senderUuid);
-					addClient(client);
-				} else if (clients.containsKey(client.getUuid()) && !(clients.get(client.getUuid()).equals(client))) {
-					//If client was created with UDP, then use the already added client, and add tcpSocket to it.
-					ClientInformation temp = client;
-					client = clients.get(client.getUuid());
-					client.setTcpSocket(temp.getTcpSocket());
+				try {
+					Packet packet = packetRegistry.parsePacket(payload);
+					
+					if (client.getUuid() == null) { //First time receiving a packet, set uuid and add to clients list.
+						client.setUuid(packet.senderUuid);
+						addClient(client);
+					} else if (clients.containsKey(client.getUuid()) && !(clients.get(client.getUuid()).equals(client))) {
+						//If client was created with UDP, then use the already added client, and add tcpSocket to it.
+						ClientInformation temp = client;
+						client = clients.get(client.getUuid());
+						client.setTcpSocket(temp.getTcpSocket());
+					}
+					
+					//If packet was SendUuid, then we can set udpPort too.
+					if (packet instanceof SendUuid) {
+						SendUuid p = (SendUuid) packet;
+						client.setUdpPort(p.udpPort);
+					}
+					
+					handlePacket(packet, Protocol.TCP);
+				} catch (JsonSyntaxException e) {
+					e.printStackTrace(System.err);
 				}
-				
-				//If packet was SendUuid, then we can set udpPort too.
-				if (packet instanceof SendUuid) {
-					SendUuid p = (SendUuid) packet;
-					client.setUdpPort(p.udpPort);
-				}
-				
-				handlePacket(packet, Protocol.TCP);
 			}
 		} catch (EOFException e) {
 			printMessage("Client disconnected normally TCP: " + client.getUuid());
@@ -156,20 +161,24 @@ public class Server {
 					continue;
 				}
 				
-				Packet packet = packetRegistry.parsePacket(payload);
-				
-				ClientInformation client = clients.get(packet.senderUuid);
-				
-				if (client == null) { //If first packet was UDP, we create the ClientInformation.
-					client = new ClientInformation(udpSocket.getInetAddress(), udpSocket.getPort(), packet.senderUuid, packetRegistry);
-					addClient(client);
+				try {
+					Packet packet = packetRegistry.parsePacket(payload);
+					
+					ClientInformation client = clients.get(packet.senderUuid);
+					
+					if (client == null) { //If first packet was UDP, we create the ClientInformation.
+						client = new ClientInformation(udpSocket.getInetAddress(), udpSocket.getPort(), packet.senderUuid, packetRegistry);
+						addClient(client);
+					}
+					
+					if (client.getUdpPort() == -1) { //If client was created by TCP, we add the UDP port.
+						client.setUdpPort(udpPacket.getPort());
+					}
+					
+					handlePacket(packet, Protocol.UDP);
+				} catch (JsonSyntaxException e) {
+					e.printStackTrace(System.err);
 				}
-				
-				if (client.getUdpPort() == -1) { //If client was created by TCP, we add the UDP port.
-					client.setUdpPort(udpPacket.getPort());
-				}
-				
-				handlePacket(packet, Protocol.UDP);
 			}
 		} catch (SocketException e) {
 			printMessage("Socket was closed UDP! Stopping listener.");

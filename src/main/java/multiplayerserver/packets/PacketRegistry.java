@@ -1,6 +1,7 @@
 package multiplayerserver.packets;
 
 import com.google.gson.Gson;
+import com.google.gson.JsonSyntaxException;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.function.Consumer;
@@ -139,7 +140,7 @@ public class PacketRegistry {
 	 * @param payload
 	 * @return Parsed packet or null if packet type is not registered.
 	 */
-	public Packet parsePacket(String payload) {
+	public Packet parsePacket(String payload) throws JsonSyntaxException {
 		String[] parts = payload.split(":", 2);
         String className = parts[0];
         Class<? extends Packet> clazz = classNameToClass.get(className);

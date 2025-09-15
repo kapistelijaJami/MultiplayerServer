@@ -1,5 +1,6 @@
 package multiplayerserver;
 
+import com.google.gson.JsonSyntaxException;
 import java.io.DataInputStream;
 import java.io.EOFException;
 import java.io.IOException;
@@ -72,9 +73,13 @@ public class Client implements HasUUID {
 				
 				String payload = new String(packetData);
 				
-				Packet packet = packetRegistry.parsePacket(payload);
+				try {
+					Packet packet = packetRegistry.parsePacket(payload);
 				
-				packetRegistry.callHandler(packet);
+					packetRegistry.callHandler(packet);
+				} catch (JsonSyntaxException e) {
+					e.printStackTrace(System.err);
+				}
 			}
 		} catch (EOFException e) {
 			printMessage("Server closed connection TCP. Stopping listener.");
@@ -98,9 +103,13 @@ public class Client implements HasUUID {
 				
 				String payload = new String(udpPacket.getData(), 0, udpPacket.getLength());
 				
-				Packet packet = packetRegistry.parsePacket(payload);
-				
-				packetRegistry.callHandler(packet);
+				try {
+					Packet packet = packetRegistry.parsePacket(payload);
+					
+					packetRegistry.callHandler(packet);
+				} catch (JsonSyntaxException e) {
+					e.printStackTrace(System.err);
+				}
 			}
 		} catch (SocketException e) {
 			printMessage("Connection closed UDP. Stopping listener.");
