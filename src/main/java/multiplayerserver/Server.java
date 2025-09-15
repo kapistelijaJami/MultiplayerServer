@@ -1,6 +1,5 @@
 package multiplayerserver;
 
-import com.google.gson.Gson;
 import com.google.gson.JsonSyntaxException;
 import java.io.DataInputStream;
 import java.io.EOFException;
@@ -31,22 +30,21 @@ public class Server {
 	
 	private final Map<UUID, ClientInformation> clients = new HashMap<>();
 	private final PacketRegistry packetRegistry;
-	private TargetRegistry targetRegistry;
-	private Gson gson = new Gson();
+	private final TargetRegistry targetRegistry;
 	
 	private ClientInformation hostClient;
 	
 	private boolean running = false;
 	
 	
-	public Server(int serverPort, PacketRegistry registry) {
+	public Server(int serverPort, PacketRegistry registry) { //TODO: Allow separate ports for TCP and UDP
 		this.serverPort = serverPort;
 		this.packetRegistry = registry;
 		
 		targetRegistry = new TargetRegistry(this);
 	}
 	
-	public void start() throws BindException {
+	public void start() throws IOException { //TODO: Make it possible to choose the listening protocol
 		try {
 			running = true;
 			
@@ -58,10 +56,14 @@ public class Server {
 			new Thread(this::tcpAcceptLoop).start();
 			new Thread(this::udpReceiveLoop).start();
 		} catch (BindException e) {
-			printMessage("ADDRESS ALREADY IN USE");
+			printMessage("TCP port already in use");
 			throw e;
-		} catch (IOException e) {
-			e.printStackTrace(System.err);
+		} catch (SocketException e) {
+			closeQuietly(tcpSocket);
+			printMessage("UDP Socket failed to bind");
+			BindException be = new BindException(e.getMessage());
+			be.initCause(e);
+			throw be;
 		}
 	}
 	
@@ -406,5 +408,13 @@ public class Server {
 	
 	public void printMessage(String message) {
 		System.out.println("[Server] " + message);
+	}
+
+	private void closeQuietly(AutoCloseable c) {
+		if (c != null) {
+			try {
+				c.close();
+			} catch (Exception ignored) {}
+		}
 	}
 }

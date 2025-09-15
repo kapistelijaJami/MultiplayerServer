@@ -6,6 +6,7 @@ import java.io.EOFException;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.net.BindException;
 import java.net.DatagramPacket;
 import java.net.DatagramSocket;
 import java.net.InetAddress;
@@ -32,7 +33,7 @@ public class Client implements HasUUID {
 		this(serverIP, serverPort, UUID.randomUUID(), registry);
 	}
 	
-	public Client(InetAddress serverIP, int serverPort, UUID uuid, PacketRegistry registry) {
+	public Client(InetAddress serverIP, int serverPort, UUID uuid, PacketRegistry registry) { //TODO: Allow separate ports for TCP and UDP
 		this.serverIP = serverIP;
 		this.serverPort = serverPort;
 		this.packetRegistry = registry;
@@ -40,7 +41,7 @@ public class Client implements HasUUID {
 		this.uuid = uuid;
 	}
 	
-	public void connect() {
+	public void connect() throws IOException { //TODO: Make it possible to choose the protocol
 		try {
 			running = true;
 			
@@ -55,8 +56,15 @@ public class Client implements HasUUID {
 			new Thread(this::listenUDP).start();
 			
 			sendPacket(new SendUuid(uuid, udpSocket.getLocalPort()), Protocol.TCP); //Sending UUID and udpPort to the server.
-		} catch (IOException e) {
-			e.printStackTrace(System.err);
+		} catch (BindException e) {
+			printMessage("TCP port already in use");
+			throw e;
+		} catch (SocketException e) {
+			closeQuietly(tcpSocket);
+			printMessage("UDP Socket failed to bind");
+			BindException be = new BindException(e.getMessage());
+			be.initCause(e);
+			throw be;
 		}
 	}
 	
@@ -187,5 +195,13 @@ public class Client implements HasUUID {
 	
 	public void printMessage(String message) {
 		System.out.println("[Client] " + message);
+	}
+
+	private void closeQuietly(AutoCloseable c) {
+		if (c != null) {
+			try {
+				c.close();
+			} catch (Exception ignored) {}
+		}
 	}
 }

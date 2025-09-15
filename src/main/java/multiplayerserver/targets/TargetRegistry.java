@@ -103,7 +103,7 @@ public class TargetRegistry {
 	
 	private <T extends HasUUID> void addAllIfAbsent(List<T> list, List<T> newItems) {
 		Set<UUID> existing = list.stream()
-				.map(newItem -> newItem.getUuid())
+				.map(item -> item.getUuid())
 				.collect(Collectors.toSet());
 		
 		for (T newItem : newItems) {
