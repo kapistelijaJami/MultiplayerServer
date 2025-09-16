@@ -1,6 +1,6 @@
 package multiplayerserver;
 
-import java.net.BindException;
+import java.io.IOException;
 import java.net.InetAddress;
 import java.net.UnknownHostException;
 import java.util.Scanner;
@@ -25,7 +25,7 @@ public class MultiplayerServer {
 			
 			try {
 				server.start();
-			} catch (BindException e) {
+			} catch (IOException e) {
 				return;
 			}
 			
@@ -36,7 +36,7 @@ public class MultiplayerServer {
 				packetRegistryClient.registerHandler(MovePacket.class, p -> System.out.println("Host client received move packet!"));
 				
 				client.connect();
-			} catch (UnknownHostException e) {
+			} catch (IOException e) {
 				e.printStackTrace(System.err);
 			}
 			
@@ -60,7 +60,11 @@ public class MultiplayerServer {
 				packetRegistryClient.registerHandler(MovePacket.class, MultiplayerServer::handlePacket);
 				packetRegistryClient.registerHandler(PingPacket.class, MultiplayerServer::handlePong);
 				
-				client.connect();
+				try {
+					client.connect();
+				} catch (IOException e) {
+					e.printStackTrace(System.err);
+				}
 				
 				client.sendPacket(new MovePacket(5, 10), Protocol.UDP);
 				
