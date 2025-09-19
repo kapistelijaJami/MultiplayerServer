@@ -60,11 +60,7 @@ public class MultiplayerServer {
 				packetRegistryClient.registerHandler(MovePacket.class, MultiplayerServer::handlePacket);
 				packetRegistryClient.registerHandler(PingPacket.class, MultiplayerServer::handlePong);
 				
-				try {
-					client.connect();
-				} catch (IOException e) {
-					e.printStackTrace(System.err);
-				}
+				client.connect();
 				
 				client.sendPacket(new MovePacket(5, 10), Protocol.UDP);
 				
@@ -83,6 +79,8 @@ public class MultiplayerServer {
 					e.printStackTrace(System.err);
 				}
 			} catch (UnknownHostException | InterruptedException e) {
+				e.printStackTrace(System.err);
+			} catch (IOException e) {
 				e.printStackTrace(System.err);
 			}
 		}
