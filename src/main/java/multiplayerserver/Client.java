@@ -134,7 +134,6 @@ public class Client implements HasUUID {
 		}
 	}
 	
-	
 	private void sendTCP(Packet packet) {
 		try {
 			if (packet.senderUuid == null) { //Client can ignore uuid, it will be set here.

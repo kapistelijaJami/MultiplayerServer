@@ -20,7 +20,6 @@ public class MultiplayerServer {
 			PacketRegistry packetRegistryServer = new PacketRegistry();
 			Server server = new Server(Constants.SERVER_PORT, packetRegistryServer);
 			
-			packetRegistryServer.registerPacket(MovePacket.class);
 			packetRegistryServer.registerHandler(PingPacket.class, p -> MultiplayerServer.handlePacket(p, server));
 			
 			try {
@@ -40,12 +39,8 @@ public class MultiplayerServer {
 				e.printStackTrace(System.err);
 			}
 			
-			/*try {
-				Thread.sleep(15000);
-				server.stop();
-			} catch (InterruptedException e) {
-				e.printStackTrace(System.err);
-			}*/
+			scan.nextLine();
+			server.stop();
 		} else if (isServer.toLowerCase().equals("n")) {
 			try {
 				System.out.print("Server IP address: ");
