@@ -47,6 +47,15 @@ packetRegistry.register(MovePacket.class, move -> {
 //Register ChatPacket (packetHandler is for ex. your custom object with methods for each packet type)
 packetRegistry.register(ChatPacket.class, packetHandler::addChatMessage);
 ```
+You don't need to register packets in the server if they are just being passed forwards to clients.
+But in the client you probably want to handle all packet types that it can receive.
+
+If an unregistered packet is received by a client, it prints a warning (which you can also disable) and ignores the packet.
+
+You can also register a global handler that will be called for every packet type,
+and a default handler that will be called if no handler is set up for that packet type.  
+These require that the packet is registered with `packetRegistry.registerPacket()` method at least,
+which doesn't take a handler, but tells the registry how to parse the packet.
 
 ### 3. Start a server
 ```java
@@ -87,8 +96,9 @@ server.stop();
 There are few pre-defined targets, like `Target.ALL`, which sends a packet to everyone except the client that sent the packet.
 There is `Target.HOST_CLIENT`, which sends the packet to the client that first connected to the server etc.
 And there's a method for creating a `UUID` target which sends a packet to specific client (`Target.createUUIDTarget(uuid)`).
+You can get the client's `UUID` with `client.getUuid()`, and maybe store it in your own objects too, which could implement `HasUUID` interface.
 
-But you can define your own custom targets and register their resolvers with `TargetRegistry`.
+You can define your own custom targets and register their resolvers with `TargetRegistry`.
 The resolver is a `BiFunction` which gets the `Target` and a `ResolveContext` (which has `Server` and `Packet`, and packet has `senderUuid`).
 It returns a list of objects which implement `HasUUID` interface (so they have `getUuid()` method). This makes it simple to return a list of your own objects.
 
