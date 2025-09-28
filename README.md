@@ -97,6 +97,7 @@ There are few pre-defined targets, like `Target.ALL`, which sends a packet to ev
 There is `Target.HOST_CLIENT`, which sends the packet to the client that first connected to the server etc.
 And there's a method for creating a `UUID` target which sends a packet to specific client (`Target.createUUIDTarget(uuid)`).
 You can get the client's `UUID` with `client.getUuid()`, and maybe store it in your own objects too, which could implement `HasUUID` interface.
+Server also knows all clients and their `UUIDs`.
 
 You can define your own custom targets and register their resolvers with `TargetRegistry`.
 The resolver is a `BiFunction` which gets the `Target` and a `ResolveContext` (which has `Server` and `Packet`, and packet has `senderUuid`).
