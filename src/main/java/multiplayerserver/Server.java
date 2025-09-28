@@ -5,18 +5,21 @@ import java.io.DataInputStream;
 import java.io.EOFException;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.OutputStream;
 import java.net.BindException;
 import java.net.DatagramPacket;
 import java.net.DatagramSocket;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.net.SocketException;
+import java.nio.ByteBuffer;
 import java.util.HashMap;
 import java.util.List;
 import java.util.ArrayList;
 import java.util.Map;
 import java.util.UUID;
 import java.util.stream.Collectors;
+import multiplayerserver.packets.DataPacket;
 import multiplayerserver.packets.Packet;
 import multiplayerserver.packets.PacketRegistry;
 import multiplayerserver.packets.SendUuid;
@@ -96,20 +99,23 @@ public class Server {
 				DataInputStream dataInput = new DataInputStream(in)) {
 			
 			while (running) {
-				int packetLength = dataInput.readInt();
-				byte[] packetData = new byte[packetLength];
-				dataInput.readFully(packetData);
+				int totalLength = dataInput.readInt();
+				int jsonLength = dataInput.readInt();
+				byte[] jsonBytes = new byte[jsonLength];
+				dataInput.readFully(jsonBytes);
 				
-				String payload = new String(packetData);
+				String json = new String(jsonBytes);
 				
 				try {
-					if (!packetRegistry.isPacketRegistered(payload)) { //If the packet isn't registered on the server we can still forward it to other clients.
-						Packet basePacket = packetRegistry.parseAsBasePacket(payload);
-						forwardPayload(basePacket, payload, Protocol.TCP);
+					if (!packetRegistry.isPacketRegistered(json)) { //If the packet isn't registered on the server we can still forward it to other clients.
+						Packet basePacket = packetRegistry.parseAsBasePacket(json);
+						byte[] rawBytes = new byte[totalLength - jsonLength]; //Might be empty
+						dataInput.readFully(rawBytes);
+						forwardPayload(basePacket, jsonBytes, rawBytes, Protocol.TCP);
 						continue;
 					}
 					
-					Packet packet = packetRegistry.parsePacket(payload);
+					Packet packet = packetRegistry.parsePacket(json);
 					
 					if (client.getUuid() == null) { //First time receiving a packet, set uuid and add to clients list.
 						client.setUuid(packet.senderUuid);
@@ -125,6 +131,14 @@ public class Server {
 					if (packet instanceof SendUuid) {
 						SendUuid p = (SendUuid) packet;
 						client.setUdpPort(p.udpPort);
+					}
+					
+					if (packet instanceof DataPacket) { //Manually read and set the raw data if packet is DataPacket
+						DataPacket dataPacket = (DataPacket) packet;
+						byte[] rawBytes = new byte[dataPacket.dataLength];
+						dataInput.readFully(rawBytes);
+						
+						dataPacket.setData(rawBytes);
 					}
 					
 					handlePacket(packet, Protocol.TCP);
@@ -155,16 +169,24 @@ public class Server {
 			while (running) {
 				udpSocket.receive(udpPacket);
 				
-				String payload = new String(udpPacket.getData(), 0, udpPacket.getLength());
+				ByteBuffer buf = ByteBuffer.wrap(udpPacket.getData(), 0, udpPacket.getLength());
+				int jsonLength = buf.getInt();
+				
+				byte[] jsonBytes = new byte[jsonLength];
+				buf.get(jsonBytes);
+				
+				String json = new String(jsonBytes);
 				
 				try {
-					if (!packetRegistry.isPacketRegistered(payload)) { //If the packet isn't registered on the server we can still forward it to other clients.
-						Packet basePacket = packetRegistry.parseAsBasePacket(payload);
-						forwardPayload(basePacket, payload, Protocol.UDP);
+					if (!packetRegistry.isPacketRegistered(json)) { //If the packet isn't registered on the server we can still forward it to other clients.
+						Packet basePacket = packetRegistry.parseAsBasePacket(json);
+						byte[] rawBytes = new byte[buf.remaining()]; //Might be empty
+						buf.get(rawBytes);
+						forwardPayload(basePacket, jsonBytes, rawBytes, Protocol.UDP);
 						continue;
 					}
 					
-					Packet packet = packetRegistry.parsePacket(payload);
+					Packet packet = packetRegistry.parsePacket(json);
 					
 					ClientInformation client = clients.get(packet.senderUuid);
 					
@@ -175,6 +197,14 @@ public class Server {
 					
 					if (client.getUdpPort() == -1) { //If client was created by TCP, we add the UDP port.
 						client.setUdpPort(udpPacket.getPort());
+					}
+					
+					if (packet instanceof DataPacket) { //Manually read and set the raw data if packet is DataPacket
+						DataPacket dataPacket = (DataPacket) packet;
+						byte[] rawBytes = new byte[dataPacket.dataLength];
+						buf.get(rawBytes);
+						
+						dataPacket.setData(rawBytes);
 					}
 					
 					handlePacket(packet, Protocol.UDP);
@@ -197,7 +227,6 @@ public class Server {
 	 * @param protocol 
 	 */
 	private void handlePacket(Packet packet, Protocol protocol) {
-		//TODO: Should the callHandler be called if server is not in the targets? (Maybe just have server handle all packets no matter the target, like it is now)
 		packetRegistry.callHandler(packet); //TODO: Should these create new threads? (ChatGPT thinks it's not necessary, and this guarantees sequential execution.)
 											//Could add boolean heavyTask to Packet, and only create threads for heavy tasks, or just let handlers create threads.
 		
@@ -205,9 +234,9 @@ public class Server {
 		sendToClients(targetClients, packet, protocol);
 	}
 	
-	private void forwardPayload(Packet packet, String payload, Protocol protocol) {
+	private void forwardPayload(Packet packet, byte[] jsonBytes, byte[] rawBytes, Protocol protocol) {
 		List<? extends HasUUID> targetClients = targetRegistry.resolveTargets(new ResolveContext(this, packet), packet.targets);
-		sendPayloadToClients(targetClients, packet.senderUuid, payload, protocol);
+		sendPayloadToClients(targetClients, packet.senderUuid, jsonBytes, rawBytes, protocol);
 	}
 	
 	public ClientInformation getClient(UUID uuid) {
@@ -282,22 +311,21 @@ public class Server {
 		}
 	}
 	
-	public void sendPayloadToClients(List<? extends HasUUID> clients, UUID senderUuid, String payload, Protocol protocol) {
+	public void sendPayloadToClients(List<? extends HasUUID> clients, UUID senderUuid, byte[] jsonBytes, byte[] rawBytes, Protocol protocol) {
 		for (HasUUID client : clients) {
 			if (client.getUuid().equals(senderUuid)) { //Don't send packet back to sender.
 				continue;
 			}
 			
-			sendPayload(client.getUuid(), payload, protocol);
+			sendPayload(client.getUuid(), jsonBytes, rawBytes, protocol);
 		}
 	}
 	
 	public void sendPacket(UUID uuid, Packet packet, Protocol protocol) {
-		if (protocol == Protocol.TCP) {
-			sendTCP(uuid, packet);
-		} else if (protocol == Protocol.UDP) {
-			sendUDP(uuid, packet);
-		}
+		ClientInformation client = clients.get(uuid);
+		if (client == null) return;
+		
+		sendPacket(client, packet, protocol);
 	}
 	
 	public void sendPacket(ClientInformation client, Packet packet, Protocol protocol) {
@@ -308,70 +336,85 @@ public class Server {
 		}
 	}
 	
-	public void sendPayload(UUID uuid, String payload, Protocol protocol) {
-		if (protocol == Protocol.TCP) {
-			sendPayloadTCP(uuid, payload);
-		} else if (protocol == Protocol.UDP) {
-			sendPayloadUDP(uuid, payload);
-		}
-	}
-	
-	public void sendPayload(ClientInformation client, String payload, Protocol protocol) {
-		if (protocol == Protocol.TCP) {
-			sendPayloadTCP(client, payload);
-		} else if (protocol == Protocol.UDP) {
-			sendPayloadUDP(client, payload);
-		}
-	}
-	
-	private void sendTCP(UUID uuid, Packet packet) {
-		ClientInformation client = clients.get(uuid);
-		if (client == null) return;
-		
-		sendTCP(client, packet);
-	}
-	
 	private void sendTCP(ClientInformation client, Packet packet) {
-		client.sendTCP(packet);
-	}
-	
-	private void sendPayloadTCP(UUID uuid, String payload) {
-		ClientInformation client = clients.get(uuid);
-		if (client == null) return;
+		packet.protocol = Protocol.TCP; //Set protocol before sending.
 		
-		sendPayloadTCP(client, payload);
-	}
-	
-	private void sendPayloadTCP(ClientInformation client, String payload) {
-		client.sendTCP(payload);
-	}
-	
-	private void sendUDP(UUID uuid, Packet packet) {
-		ClientInformation client = clients.get(uuid);
-		if (client == null) return;
+		String json = packetRegistry.serialize(packet);
+		byte[] jsonBytes = json.getBytes();
+		byte[] rawBytes = null;
 		
-		sendUDP(client, packet);
+		if (packet instanceof DataPacket) {
+			DataPacket dataPacket = (DataPacket) packet;
+			rawBytes = dataPacket.getData();
+		}
+		
+		sendPayloadTCP(client, jsonBytes, rawBytes);
 	}
 	
 	private void sendUDP(ClientInformation client, Packet packet) {
 		packet.protocol = Protocol.UDP; //Set protocol before sending.
 
-		String payload = packetRegistry.serialize(packet);
-		sendPayloadUDP(client, payload);
+		String json = packetRegistry.serialize(packet); //TODO: Check that the packet isn't too large for UDP
+		
+		byte[] jsonBytes = json.getBytes();
+		byte[] rawBytes = null;
+		
+		if (packet instanceof DataPacket) {
+			DataPacket dataPacket = (DataPacket) packet;
+			rawBytes = dataPacket.getData();
+		}
+		
+		sendPayloadUDP(client, jsonBytes, rawBytes);
 	}
 	
-	private void sendPayloadUDP(UUID uuid, String payload) {
+	public void sendPayload(UUID uuid, byte[] jsonBytes, byte[] rawBytes, Protocol protocol) {
 		ClientInformation client = clients.get(uuid);
 		if (client == null) return;
 		
-		sendPayloadUDP(client, payload);
+		sendPayload(client, jsonBytes, rawBytes, protocol);
 	}
 	
-	private void sendPayloadUDP(ClientInformation client, String payload) {
+	public void sendPayload(ClientInformation client, byte[] jsonBytes, byte[] rawBytes, Protocol protocol) {
+		if (protocol == Protocol.TCP) {
+			sendPayloadTCP(client, jsonBytes, rawBytes);
+		} else if (protocol == Protocol.UDP) {
+			sendPayloadUDP(client, jsonBytes, rawBytes);
+		}
+	}
+	
+	private void sendPayloadTCP(ClientInformation client, byte[] jsonBytes, byte[] rawBytes) {
 		try {
-			byte[] data = payload.getBytes();
+			OutputStream out = client.getTcpSocket().getOutputStream();
 			
-			DatagramPacket udpPacket = new DatagramPacket(data, data.length, client.getIpAddress(), client.getUdpPort());
+			int totalLength = jsonBytes.length + (rawBytes != null ? rawBytes.length : 0);
+			
+			//Now TCP packet will have [4 bytes total length][4 bytes json length][json bytes][raw data bytes] (json data also includes raw data length in the packet)
+			//(Total length is just json bytes + raw data bytes)
+			out.write(ByteBuffer.allocate(Constants.PACKET_LENGTH_PREFIX_BYTES).putInt(totalLength).array());
+			out.write(ByteBuffer.allocate(Constants.PACKET_LENGTH_PREFIX_BYTES).putInt(jsonBytes.length).array());
+			out.write(jsonBytes);
+			if (rawBytes != null) {
+				out.write(rawBytes);
+			}
+			out.flush();
+		} catch (IOException e) {
+			e.printStackTrace(System.err);
+		}
+	}
+	
+	private void sendPayloadUDP(ClientInformation client, byte[] jsonBytes, byte[] rawBytes) {
+		try {
+			//Now UDP packet will have [4 bytes json length][json bytes][raw data bytes] (json data also includes raw data length in the packet)
+			int totalLength = Constants.PACKET_LENGTH_PREFIX_BYTES + jsonBytes.length + (rawBytes != null ? rawBytes.length : 0);
+			
+			ByteBuffer buffer = ByteBuffer.allocate(totalLength);
+			buffer.putInt(jsonBytes.length);
+			buffer.put(jsonBytes);
+			if (rawBytes != null) {
+				buffer.put(rawBytes);
+			}
+			
+			DatagramPacket udpPacket = new DatagramPacket(buffer.array(), buffer.array().length, client.getIpAddress(), client.getUdpPort());
 			udpSocket.send(udpPacket);
 		} catch (IOException e) {
 			e.printStackTrace(System.err);

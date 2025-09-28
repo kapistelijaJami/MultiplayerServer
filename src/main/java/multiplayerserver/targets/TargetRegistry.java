@@ -43,8 +43,7 @@ public class TargetRegistry {
 	private void registerBuiltInTargets() {
 		register(Target.ALL, (t, ctx) -> new ArrayList<>(ctx.server.getClients()));
 		
-		register(Target.SERVER, (t, ctx) -> Collections.emptyList()); //TODO: See what to do with server, since it's not a client, and this returns a list of clients.
-																	  //Could either remove the server target, or have it not do anything, like it is now.
+		register(Target.SERVER, (t, ctx) -> Collections.emptyList()); //Doesn't do anything. Server will always get the packets and handle them.
 		
 		register(Target.HOST_CLIENT, (t, ctx) -> {
 			ClientInformation host = ctx.server.getHostClient();

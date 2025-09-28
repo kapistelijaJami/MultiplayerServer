@@ -14,6 +14,7 @@ import java.net.Socket;
 import java.net.SocketException;
 import java.nio.ByteBuffer;
 import java.util.UUID;
+import multiplayerserver.packets.DataPacket;
 import multiplayerserver.packets.Packet;
 import multiplayerserver.packets.PacketRegistry;
 import multiplayerserver.packets.SendUuid;
@@ -75,14 +76,23 @@ public class Client implements HasUUID {
 				DataInputStream dataInput = new DataInputStream(in)) {
 			
 			while (running) {
-				int packetLength = dataInput.readInt();
-				byte[] packetData = new byte[packetLength];
-				dataInput.readFully(packetData);
+				int totalLength = dataInput.readInt();
+				int jsonLength = dataInput.readInt();
+				byte[] jsonBytes = new byte[jsonLength];
+				dataInput.readFully(jsonBytes);
 				
-				String payload = new String(packetData);
+				String json = new String(jsonBytes);
 				
 				try {
-					Packet packet = packetRegistry.parsePacket(payload);
+					Packet packet = packetRegistry.parsePacket(json);
+					
+					if (packet instanceof DataPacket) { //Manually read and set the raw data if packet is DataPacket
+						DataPacket dataPacket = (DataPacket) packet;
+						byte[] rawBytes = new byte[dataPacket.dataLength];
+						dataInput.readFully(rawBytes);
+						
+						dataPacket.setData(rawBytes);
+					}
 					
 					packetRegistry.callHandler(packet);
 				} catch (JsonSyntaxException e) {
@@ -109,10 +119,24 @@ public class Client implements HasUUID {
 			while (running) {
 				udpSocket.receive(udpPacket);
 				
-				String payload = new String(udpPacket.getData(), 0, udpPacket.getLength());
+				ByteBuffer buf = ByteBuffer.wrap(udpPacket.getData(), 0, udpPacket.getLength());
+				int jsonLength = buf.getInt();
+				
+				byte[] jsonBytes = new byte[jsonLength];
+				buf.get(jsonBytes);
+				
+				String json = new String(jsonBytes);
 				
 				try {
-					Packet packet = packetRegistry.parsePacket(payload);
+					Packet packet = packetRegistry.parsePacket(json);
+					
+					if (packet instanceof DataPacket) { //Manually read and set the raw data if packet is DataPacket
+						DataPacket dataPacket = (DataPacket) packet;
+						byte[] rawBytes = new byte[dataPacket.dataLength];
+						buf.get(rawBytes);
+						
+						dataPacket.setData(rawBytes);
+					}
 					
 					packetRegistry.callHandler(packet);
 				} catch (JsonSyntaxException e) {
@@ -143,11 +167,23 @@ public class Client implements HasUUID {
 			
 			OutputStream out = tcpSocket.getOutputStream();
 			
-			String payload = packetRegistry.serialize(packet);
-			byte[] data = payload.getBytes();
+			String json = packetRegistry.serialize(packet);
+			byte[] jsonBytes = json.getBytes();
+			byte[] rawBytes = null;
 			
-			out.write(ByteBuffer.allocate(Constants.PACKET_LENGTH_PREFIX_BYTES).putInt(data.length).array());
-			out.write(data);
+			if (packet instanceof DataPacket) {
+				DataPacket dataPacket = (DataPacket) packet;
+				rawBytes = dataPacket.getData();
+			}
+			
+			int totalLength = jsonBytes.length + (rawBytes != null ? rawBytes.length : 0);
+			
+			out.write(ByteBuffer.allocate(Constants.PACKET_LENGTH_PREFIX_BYTES).putInt(totalLength).array());
+			out.write(ByteBuffer.allocate(Constants.PACKET_LENGTH_PREFIX_BYTES).putInt(jsonBytes.length).array());
+			out.write(jsonBytes);
+			if (rawBytes != null) {
+				out.write(rawBytes);
+			}
 			out.flush();
 		} catch (IOException e) {
 			e.printStackTrace(System.err);
@@ -161,10 +197,25 @@ public class Client implements HasUUID {
 			}
 			packet.protocol = Protocol.UDP; //Also set protocol before sending.
 			
-			String payload = packetRegistry.serialize(packet);
-			byte[] data = payload.getBytes();
+			String json = packetRegistry.serialize(packet); //TODO: Check that the packet isn't too large for UDP
+			byte[] jsonBytes = json.getBytes();
+			byte[] rawBytes = null;
 			
-			DatagramPacket udpPacket = new DatagramPacket(data, data.length);
+			if (packet instanceof DataPacket) {
+				DataPacket dataPacket = (DataPacket) packet;
+				rawBytes = dataPacket.getData();
+			}
+			
+			int totalLength = Constants.PACKET_LENGTH_PREFIX_BYTES + jsonBytes.length + (rawBytes != null ? rawBytes.length : 0);
+			
+			ByteBuffer buffer = ByteBuffer.allocate(totalLength);
+			buffer.putInt(jsonBytes.length);
+			buffer.put(jsonBytes);
+			if (rawBytes != null) {
+				buffer.put(rawBytes);
+			}
+			
+			DatagramPacket udpPacket = new DatagramPacket(buffer.array(), buffer.array().length);
 			udpSocket.send(udpPacket);
 		} catch (IOException e) {
 			e.printStackTrace(System.err);
