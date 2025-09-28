@@ -26,7 +26,7 @@ public class MovePacket extends Packet {
     }
 }
 ```
-Packets only need the data fields and a constructor.
+Packets only need the data fields and a constructor. (It's recommended to also add an empty default constructor for `Gson`)
 
 You can also send raw data without the overhead of `Gson` serializing it with `Base64` encoding.
 Then have your packet extend `DataPacket` instead, and pass the data to the constructor of the super class.
