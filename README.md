@@ -28,9 +28,12 @@ public class MovePacket extends Packet {
 ```
 Packets only need the data fields and a constructor.
 
+You can also send raw data without the overhead of `Gson` serializing it with `Base64` encoding.
+Then have your packet extend `DataPacket` instead, and pass the data to the constructor of the super class.
+
 ### 2. Register handlers for specific packets
 Use `PacketRegistry` to register your packet types and attach handlers.  
-Use separate `PacketRegistry` instance for server and clients.  
+Use separate `PacketRegistry` instances for server and clients.  
 When receiving a packet, the packet subclass will be parsed and passed to the handler.
 
 ```java
@@ -41,7 +44,7 @@ packetRegistry.register(MovePacket.class, move -> {
     System.out.println("Player (" + move.senderUuid + ") moved to: " + move.x + ", " + move.y);
 });
 
-//Register ChatPacket (packetHandler is your custom class with methods for each packet type for ex.)
+//Register ChatPacket (packetHandler is for ex. your custom object with methods for each packet type)
 packetRegistry.register(ChatPacket.class, packetHandler::addChatMessage);
 ```
 
@@ -69,6 +72,13 @@ try {
 ```java
 MovePacket movePacket = new MovePacket(player.getX(), player.getY(), Target.ALL);
 client.sendPacket(movePacket, Protocol.UDP);
+```
+
+### 6. Call client and server stop() methods when exiting
+```java
+client.stop();
+
+server.stop();
 ```
 
 ## Targeting system
