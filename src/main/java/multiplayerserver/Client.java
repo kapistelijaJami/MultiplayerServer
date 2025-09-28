@@ -76,7 +76,7 @@ public class Client implements HasUUID {
 				DataInputStream dataInput = new DataInputStream(in)) {
 			
 			while (running) {
-				int totalLength = dataInput.readInt();
+				dataInput.readInt(); //Total length not needed in the client
 				int jsonLength = dataInput.readInt();
 				byte[] jsonBytes = new byte[jsonLength];
 				dataInput.readFully(jsonBytes);

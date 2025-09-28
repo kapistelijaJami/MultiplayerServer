@@ -6,6 +6,8 @@ public class PingPacket extends Packet {
 	public String text;
 	public long startTime;
 	
+	public PingPacket() {}
+	
 	public PingPacket(String text, Target... targets) {
 		this.text = text;
 		startTime = System.currentTimeMillis();
