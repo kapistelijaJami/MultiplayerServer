@@ -41,7 +41,7 @@ packetRegistry.register(MovePacket.class, move -> {
     System.out.println("Player (" + move.senderUuid + ") moved to: " + move.x + ", " + move.y);
 });
 
-//Register ChatPacket (where packetHandler is your custom class with methods for each packet type for example)
+//Register ChatPacket (packetHandler is your custom class with methods for each packet type for ex.)
 packetRegistry.register(ChatPacket.class, packetHandler::addChatMessage);
 ```
 
@@ -110,8 +110,9 @@ targetRegistry.register(Targets.OWN_TEAM, (target, ctx) -> {
     return team.getPlayers();
 });
 
-//Registering an example resolver which returns a list of players that belong to a specific team based on its id:
-//(When registering targets, only the 'type' String needs to be correct for the first argument, so team id -1 works)
+//An example resolver which returns a list of players that belong to a specific team based on its id:
+//(When registering targets, only the 'type' String needs to be correct for
+//the first argument, so team id -1 works)
 targetRegistry.register(Targets.createTeamIdTarget(-1), (target, ctx) -> {
     Optional<Team> team = game.getTeams().stream()
             .filter(t -> t.getId() == Integer.parseInt(target.getValue()))
