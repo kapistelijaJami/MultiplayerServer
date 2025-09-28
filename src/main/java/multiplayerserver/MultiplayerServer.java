@@ -3,10 +3,12 @@ package multiplayerserver;
 import java.io.IOException;
 import java.net.InetAddress;
 import java.net.UnknownHostException;
+import java.util.Arrays;
 import java.util.Scanner;
 import multiplayerserver.packets.MovePacket;
 import multiplayerserver.packets.PacketRegistry;
 import multiplayerserver.packets.PingPacket;
+import multiplayerserver.packets.RawDataPacket;
 import multiplayerserver.targets.Target;
 
 public class MultiplayerServer {
@@ -33,6 +35,7 @@ public class MultiplayerServer {
 				Client client = new Client(InetAddress.getByName("127.0.0.1"), Constants.SERVER_PORT, packetRegistryClient);
 				
 				packetRegistryClient.register(MovePacket.class, p -> System.out.println("Host client received move packet!"));
+				packetRegistryClient.register(RawDataPacket.class, p -> System.out.println("Host client received raw data packet! " + p.extraText + " " + Arrays.toString(p.getData())));
 				
 				client.connect();
 			} catch (IOException e) {
@@ -72,6 +75,11 @@ public class MultiplayerServer {
 				Thread.sleep(1000);
 				
 				client.sendPacket(new MovePacket(15, 20, Target.ALL), Protocol.UDP);
+				
+				Thread.sleep(1000);
+				
+				byte[] rawBytes = new byte[] {10, 20, 30, 40, 50};
+				client.sendPacket(new RawDataPacket(rawBytes, "Hello", Target.ALL), Protocol.TCP);
 				
 				try {
 					Thread.sleep(3000);
