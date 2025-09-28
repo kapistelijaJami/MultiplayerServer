@@ -18,6 +18,8 @@ public class PacketRegistry {
 	
 	private final Gson gson = new Gson();
 	
+	private boolean disableWarnings = false;
+	
 	public PacketRegistry() {
 		registerBuiltInPackets();
 	}
@@ -27,10 +29,14 @@ public class PacketRegistry {
 	}
 	
 	/**
-	 * Register a packet for serialization and parsing.
+	 * Register a packet for packet parsing.
 	 * Server doesn't need to register packets that are just forwarded to clients.
-	 * Need to call registerHandler() if you want to react to receiving a packet type.
-	 * Don't need to call this if you call registerHandler().
+	 * Need to call register() if you want to react to receiving a packet type.
+	 * Don't need to call this if you call register().
+	 * 
+	 * Required for when you want to react to a packet with a global or default handler,
+	 * not needed otherwise. If a client can receive unregistered packets that you don't
+	 * want to react to, you can disable warnings, or just register them using registerPacket().
 	 * 
 	 * Custom packet classes need to extend Packet.
 	 * <p>
@@ -53,16 +59,17 @@ public class PacketRegistry {
 	 * Register a packet and set a handler for that packet type.
 	 * Needs to be called for all the packets you want to handle in that client/server.
 	 * Server doesn't need to register packets that are just forwarded to clients.
-	 * Use separate PacketRegistry for server and clients.
+	 * Use separate PacketRegistry instance for server and clients.
 	 * <p>
-	 * If you don't want to handle a packet, but want to be able to serialize it (for sending)
-	 * and parse it, you need to call registerPacket() on the packet type.
+	 * If you don't want to handle a packet, but want to be able to parse it,
+	 * (for example for default/global handler) you need to call registerPacket()
+	 * on the packet type.
 	 * <p>
 	 * Packet classes need to extend Packet.
 	 * <p>
-	 * Usage: registry.registerHandler(MovePacket.class, handlerFunction);
+	 * Usage: registry.register(MovePacket.class, handlerFunction);
 	 * <p>
-	 * Create handlerFunction (Consumer) with one of these methods:
+	 * Create handlerFunction (Consumer) with one of these ways (it accepts a Packet subclass):
 	 * <ul>
 	 * <li>Lambda expression:
 	 * <ul>
@@ -85,8 +92,8 @@ public class PacketRegistry {
 	 * </ul>
 	 * Like this:
 	 * <pre>
-	 *  <code>registry.registerHandler(MovePacket.class, move -> game.movePlayer(move));</code>
-	 *  <code>registry.registerHandler(ChatPacket.class, packetHandler::addChatMessage);</code>
+	 *  <code>registry.register(MovePacket.class, move -> game.movePlayer(move));</code>
+	 *  <code>registry.register(ChatPacket.class, packetHandler::addChatMessage);</code>
 	 * </pre>
 	 * <code>handlerFunction</code> can also be null (or just call registerPacket), in
 	 * which case you can set up global handler function, or a default handler function.
@@ -95,18 +102,23 @@ public class PacketRegistry {
 	 * @param clazz 
 	 * @param handler 
 	 */
-	public <T extends Packet> void registerHandler(Class<T> clazz, Consumer<T> handler) {
+	public <T extends Packet> void register(Class<T> clazz, Consumer<T> handler) {
 		if (handlers.containsKey(clazz)) return;
 		
 		if (!classNameToClass.containsKey(clazz.getName())) {
 			String className = clazz.getName();
 			classNameToClass.put(className, clazz);
 		}
+		
+		if (handler == null) {
+			return;
+		}
         handlers.put(clazz, handler);
 	}
 	
 	/**
 	 * Default handler will be called if no handler is registered for packet type, or it's null.
+	 * Packet type needs to be registered with register() or registerPacket().
 	 * @param handler 
 	 */
 	public void setDefaultHandler(Consumer<Packet> handler) {
@@ -115,6 +127,7 @@ public class PacketRegistry {
 	
 	/**
 	 * Global handler will be called for every packet received.
+	 * Packet type needs to be registered with register() or registerPacket().
 	 * @param handler 
 	 */
     public void setGlobalHandler(Consumer<Packet> handler) {
@@ -146,7 +159,9 @@ public class PacketRegistry {
         Class<? extends Packet> clazz = classNameToClass.get(className);
 		
 		if (clazz == null) {
-			System.out.println("Warning: Received an unregistered packet: " + className + ". Ignoring it.");
+			if (!disableWarnings) {
+				System.err.println("Warning: Received an unregistered packet: " + className + ". Ignoring it.");
+			}
 			return null;
 		}
 		
@@ -161,6 +176,14 @@ public class PacketRegistry {
 	public Packet parseAsBasePacket(String payload) throws JsonSyntaxException {
 		String[] parts = payload.split(":", 2);
 		return gson.fromJson(parts[1], BasePacket.class);
+	}
+	
+	/**
+	 * If warnings are not disabled, then it prints a warning when an unregistered packet is received.
+	 * @param b 
+	 */
+	public void setDisableWarnings(boolean b) {
+		disableWarnings = b;
 	}
 	
 	/**

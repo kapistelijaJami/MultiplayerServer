@@ -11,24 +11,21 @@ import java.util.function.BiFunction;
 import java.util.stream.Collectors;
 import multiplayerserver.ClientInformation;
 import multiplayerserver.HasUUID;
-import multiplayerserver.Protocol;
-import multiplayerserver.Server;
-import multiplayerserver.packets.Packet;
 
 /**
  * Keeps track of different targets for simple packet delivery.
  * Resolver is a BiFunction which gets the Target and a ResolveContext as a parameter.
  * ResolveContext contains the Server object and Packet (which has the senderUuid).
- * Resolver can use the server to get clients and it returns a list of objects who
- * this target applies to that implement HasUUID interface. (Clients/players etc.)
+ * Resolver can use the server to get clients and it returns a list of objects
+ * (which implement HasUUID interface) who this target applies to. (Clients/players etc.)
  * <p>
  * Built-in targets (which you don't need to register yourself) are:
  *     ALL, SERVER, HOST_CLIENT, ALL_BUT_HOST_CLIENT, and UUIDTarget.
  * <p>
  * Can register new targets and resolvers like this:
  * <pre>{@code
- * targetRegistry.register(customTarget, (s, t) -> {
- *     return s.getClients();
+ * targetRegistry.register(customTarget, (target, ctx) -> {
+ *     return ctx.server.getClients();
  * });}</pre>
  * <p>
  * You can also use your own variables and objects inside the code block that were defined before the
@@ -36,11 +33,10 @@ import multiplayerserver.packets.Packet;
  */
 public class TargetRegistry {
 	private final Map<String, BiFunction<Target, ResolveContext, List<? extends HasUUID>>> resolvers = new HashMap<>();
-    private final Server server;
 	
-	public TargetRegistry(Server server) {
-		this.server = server;
-		
+	private boolean disableWarnings = false;
+	
+	public TargetRegistry() {
         registerBuiltInTargets();
 	}
 	
@@ -65,8 +61,9 @@ public class TargetRegistry {
 	
 	/**
 	 * Register a resolver for a target.
-	 * Resolver is a BiFunction, it takes Server and Target, and
+	 * Resolver is a BiFunction, it takes Target and ResolveContext, and
 	 * returns a list of objects that implement HasUUID interface.
+	 * ResolveContext has Server and Packet (which has the senderUuid).
 	 * @param target
 	 * @param resolver 
 	 */
@@ -82,7 +79,10 @@ public class TargetRegistry {
         BiFunction<Target, ResolveContext, List<? extends HasUUID>> resolver = resolvers.get(target.getType());
 		
         if (resolver == null) {
-            throw new IllegalArgumentException("Unknown target: " + target.getType());
+			if (!disableWarnings) {
+				System.err.println("Warning: Unknown target: " + target.getType());
+			}
+			return Collections.EMPTY_LIST;
         }
 		
         return (List<T>) resolver.apply(target, ctx);
@@ -113,7 +113,11 @@ public class TargetRegistry {
 		}
 	}
 	
-	public void sendToTargets(List<? extends HasUUID> targets, Packet packet, Protocol protocol) {
-		server.sendToClients(targets, packet, protocol);
+	/**
+	 * If warnings are not disabled, then it prints a warning when an unknown target is received.
+	 * @param b 
+	 */
+	public void setDisableWarnings(boolean b) {
+		disableWarnings = b;
 	}
 }

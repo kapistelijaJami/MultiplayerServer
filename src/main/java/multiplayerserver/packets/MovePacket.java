@@ -2,6 +2,9 @@ package multiplayerserver.packets;
 
 import multiplayerserver.targets.Target;
 
+/**
+ * Example packet.
+ */
 public class MovePacket extends Packet {
 	public int x, y;
 	

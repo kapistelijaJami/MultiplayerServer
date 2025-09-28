@@ -83,7 +83,7 @@ public class Client implements HasUUID {
 				
 				try {
 					Packet packet = packetRegistry.parsePacket(payload);
-				
+					
 					packetRegistry.callHandler(packet);
 				} catch (JsonSyntaxException e) {
 					e.printStackTrace(System.err);
@@ -187,15 +187,15 @@ public class Client implements HasUUID {
 		
 		printMessage("Client stopped.");
 	}
-
+	
 	public boolean isRunning() {
 		return running;
 	}
 	
-	public void printMessage(String message) {
+	public void printMessage(String message) { //TODO: Make possible to disable printing.
 		System.out.println("[Client] " + message);
 	}
-
+	
 	private void closeQuietly(AutoCloseable c) {
 		if (c != null) {
 			try {

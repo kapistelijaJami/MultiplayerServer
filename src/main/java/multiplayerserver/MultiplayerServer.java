@@ -20,7 +20,7 @@ public class MultiplayerServer {
 			PacketRegistry packetRegistryServer = new PacketRegistry();
 			Server server = new Server(Constants.SERVER_PORT, packetRegistryServer);
 			
-			packetRegistryServer.registerHandler(PingPacket.class, p -> MultiplayerServer.handlePacket(p, server));
+			packetRegistryServer.register(PingPacket.class, p -> MultiplayerServer.handlePacket(p, server));
 			
 			try {
 				server.start();
@@ -32,15 +32,21 @@ public class MultiplayerServer {
 				PacketRegistry packetRegistryClient = new PacketRegistry();
 				Client client = new Client(InetAddress.getByName("127.0.0.1"), Constants.SERVER_PORT, packetRegistryClient);
 				
-				packetRegistryClient.registerHandler(MovePacket.class, p -> System.out.println("Host client received move packet!"));
+				packetRegistryClient.register(MovePacket.class, p -> System.out.println("Host client received move packet!"));
 				
 				client.connect();
 			} catch (IOException e) {
 				e.printStackTrace(System.err);
 			}
 			
-			scan.nextLine();
-			server.stop();
+			try {
+				Thread.sleep(500);
+				System.out.println("\nPress enter to close server.");
+				scan.nextLine();
+				server.stop();
+			} catch (InterruptedException e) {
+				e.printStackTrace(System.err);
+			}
 		} else if (isServer.toLowerCase().equals("n")) {
 			try {
 				System.out.print("Server IP address: ");
@@ -52,8 +58,8 @@ public class MultiplayerServer {
 				PacketRegistry packetRegistryClient = new PacketRegistry();
 				Client client = new Client(InetAddress.getByName(ipAddress), Constants.SERVER_PORT, packetRegistryClient);
 				
-				packetRegistryClient.registerHandler(MovePacket.class, MultiplayerServer::handlePacket);
-				packetRegistryClient.registerHandler(PingPacket.class, MultiplayerServer::handlePong);
+				packetRegistryClient.register(MovePacket.class, MultiplayerServer::handlePacket);
+				packetRegistryClient.register(PingPacket.class, MultiplayerServer::handlePong);
 				
 				client.connect();
 				

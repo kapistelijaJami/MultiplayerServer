@@ -41,7 +41,7 @@ public class Server {
 		this.serverPort = serverPort;
 		this.packetRegistry = registry;
 		
-		targetRegistry = new TargetRegistry(this);
+		targetRegistry = new TargetRegistry();
 	}
 	
 	public void start() throws IOException { //TODO: Make it possible to choose the listening protocol
@@ -225,6 +225,10 @@ public class Server {
 				.collect(Collectors.toList());
 	}
 	
+	/**
+	 * By default the host client is the first connected client.
+	 * @return 
+	 */
 	public ClientInformation getHostClient() {
 		return hostClient;
 	}
