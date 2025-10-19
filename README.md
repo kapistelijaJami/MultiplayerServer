@@ -162,4 +162,4 @@ You can also send multiple targets with the `Packet`. `Server` will pass it forw
 
 ---
 
-See Javadoc for extra info.
+See [Javadoc](https://kapistelijajami.github.io/MultiplayerServer/) for extra info.
