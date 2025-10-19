@@ -11,8 +11,8 @@ import multiplayerserver.packets.PingPacket;
 import multiplayerserver.packets.RawDataPacket;
 import multiplayerserver.targets.Target;
 
-public class MultiplayerServer {
-
+public class ExampleUsage {
+	
     public static void main(String[] args) {
 		Scanner scan = new Scanner(System.in);
 		System.out.print("Server (Y/n): ");
@@ -22,7 +22,7 @@ public class MultiplayerServer {
 			PacketRegistry packetRegistryServer = new PacketRegistry();
 			Server server = new Server(Constants.SERVER_PORT, packetRegistryServer);
 			
-			packetRegistryServer.register(PingPacket.class, p -> MultiplayerServer.handlePacket(p, server));
+			packetRegistryServer.register(PingPacket.class, p -> ExampleUsage.handlePacket(p, server));
 			
 			try {
 				server.start();
@@ -61,8 +61,8 @@ public class MultiplayerServer {
 				PacketRegistry packetRegistryClient = new PacketRegistry();
 				Client client = new Client(InetAddress.getByName(ipAddress), Constants.SERVER_PORT, packetRegistryClient);
 				
-				packetRegistryClient.register(MovePacket.class, MultiplayerServer::handlePacket);
-				packetRegistryClient.register(PingPacket.class, MultiplayerServer::handlePong);
+				packetRegistryClient.register(MovePacket.class, ExampleUsage::handlePacket);
+				packetRegistryClient.register(PingPacket.class, ExampleUsage::handlePong);
 				
 				client.connect();
 				

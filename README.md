@@ -59,7 +59,7 @@ which doesn't take a handler, but tells the registry how to parse the packet.
 
 ### 3. Start a server
 ```java
-server = new Server(port, packetRegistry);
+Server server = new Server(port, packetRegistry);
 try {
     server.start(); //Will start new threads for TCP and UDP
 } catch (IOException e) {
