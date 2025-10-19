@@ -1,0 +1,26 @@
+-classpath
+'C:/Users/Jami/.m2/repository/com/google/code/gson/gson/2.8.9/gson-2.8.9.jar'
+-encoding
+'UTF-8'
+-protected
+-source
+'11'
+-sourcepath
+'C:/Users/Jami/Documents/NetBeansProjects/MultiplayerServer/src/main/java'
+-author
+-bottom
+'Copyright &#169; 2025. All rights reserved.'
+-charset
+'UTF-8'
+-d
+'C:/Users/Jami/Documents/NetBeansProjects/MultiplayerServer/target/reports/apidocs'
+-docencoding
+'UTF-8'
+-doctitle
+'MultiplayerServer 1.0-SNAPSHOT API'
+-linkoffline
+'https://docs.oracle.com/en/java/javase/11/docs/api' 'C:/Users/Jami/Documents/NetBeansProjects/MultiplayerServer/target/javadoc-bundle-options'
+-use
+-version
+-windowtitle
+'MultiplayerServer 1.0-SNAPSHOT API'
